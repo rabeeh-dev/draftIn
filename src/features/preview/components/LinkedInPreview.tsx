@@ -4,6 +4,7 @@ import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
 import { formatLinkedInContent } from '../utils/contentRenderer'
 import { convertToLinkedInPublishingText, isContentEmpty } from '../utils/publishingText'
+import { copyTextToClipboard } from '../utils/clipboard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -42,12 +43,10 @@ export function LinkedInPreview() {
 
   const handleCopyPublishText = async () => {
     if (isEmpty || !publishingText) return
-    try {
-      await navigator.clipboard.writeText(publishingText)
+    const success = await copyTextToClipboard(publishingText)
+    if (success) {
       setCopiedPublishText(true)
       setTimeout(() => setCopiedPublishText(false), 2000)
-    } catch {
-      // Fallback
     }
   }
 

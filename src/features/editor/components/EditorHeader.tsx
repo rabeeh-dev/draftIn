@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { convertToLinkedInPublishingText, isContentEmpty } from '@/features/preview/utils/publishingText'
+import { copyTextToClipboard } from '@/features/preview/utils/clipboard'
 import { Button } from '@/components/ui/button'
 import {
   Menu,
@@ -43,12 +44,10 @@ export function EditorHeader() {
     if (isEmpty) return
     const publishingText = convertToLinkedInPublishingText(activeDraft.content)
     if (!publishingText) return
-    try {
-      await navigator.clipboard.writeText(publishingText)
+    const success = await copyTextToClipboard(publishingText)
+    if (success) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback
     }
   }
 
