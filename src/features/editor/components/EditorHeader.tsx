@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { convertToLinkedInPublishingText, isContentEmpty } from '@/features/preview/utils/publishingText'
+import { copyTextToClipboard } from '@/features/preview/utils/clipboard'
+import { PublishDialog } from '@/features/preview/components/PublishDialog'
 import { Button } from '@/components/ui/button'
 import {
   Menu,
@@ -33,17 +36,20 @@ export function EditorHeader() {
   } = useDraftStore()
 
   const [copied, setCopied] = useState(false)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
 
   if (!activeDraft) return null
 
+  const isEmpty = isContentEmpty(activeDraft.content)
+
   const handleCopy = async () => {
-    if (!activeDraft.content) return
-    try {
-      await navigator.clipboard.writeText(activeDraft.content)
+    if (isEmpty) return
+    const publishingText = convertToLinkedInPublishingText(activeDraft.content)
+    if (!publishingText) return
+    const success = await copyTextToClipboard(publishingText)
+    if (success) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback
     }
   }
 
@@ -53,11 +59,6 @@ export function EditorHeader() {
       status: nextStatus,
       scheduledFor: nextStatus === 'scheduled' ? 'Tomorrow at 9:00 AM' : undefined,
     })
-  }
-
-  const handlePublishToggle = () => {
-    const nextStatus = activeDraft.status === 'published' ? 'draft' : 'published'
-    updateDraft(activeDraft.id, { status: nextStatus })
   }
 
   return (
@@ -176,23 +177,40 @@ export function EditorHeader() {
           </button>
         </div>
 
+        {/* Copy Feedback Toast Pill */}
+        {copied && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium animate-in fade-in zoom-in-95 duration-200"
+          >
+            <Check className="size-3.5" />
+            <span>Ready for LinkedIn!</span>
+          </div>
+        )}
+
         {/* Copy Post Button */}
         <Button
           variant="outline"
           size="sm"
           onClick={handleCopy}
-          className="gap-1.5 text-xs h-8"
-          title="Copy formatted post to clipboard"
+          disabled={isEmpty}
+          className={`gap-1.5 text-xs h-8 disabled:opacity-50 transition-all ${
+            copied
+              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold'
+              : ''
+          }`}
+          title={isEmpty ? 'Draft is empty. Write your post before copying.' : 'Copy formatted post to clipboard'}
         >
           {copied ? (
             <>
               <Check className="size-3.5 text-emerald-500" />
-              <span className="hidden sm:inline text-emerald-500 font-medium">Copied!</span>
+              <span>Copied!</span>
             </>
           ) : (
             <>
               <Copy className="size-3.5" />
-              <span className="hidden sm:inline">Copy</span>
+              <span className="hidden sm:inline">Copy Post</span>
             </>
           )}
         </Button>
@@ -202,12 +220,13 @@ export function EditorHeader() {
           variant="outline"
           size="sm"
           onClick={handleScheduleToggle}
-          className={`gap-1.5 text-xs h-8 ${
+          disabled={isEmpty}
+          className={`gap-1.5 text-xs h-8 disabled:opacity-50 ${
             activeDraft.status === 'scheduled'
               ? 'border-amber-500/40 text-amber-600 bg-amber-500/10'
               : ''
           }`}
-          title="Schedule post"
+          title={isEmpty ? 'Draft is empty. Add content to schedule.' : 'Schedule post'}
         >
           <Calendar className="size-3.5" />
           <span className="hidden sm:inline">
@@ -218,13 +237,18 @@ export function EditorHeader() {
         {/* Primary Action: Publish / Share */}
         <Button
           size="sm"
-          onClick={handlePublishToggle}
-          className="gap-1.5 text-xs h-8 shadow-xs"
+          onClick={() => setPublishDialogOpen(true)}
+          disabled={isEmpty}
+          className="gap-1.5 text-xs h-8 shadow-xs disabled:opacity-50"
+          title={isEmpty ? 'Draft is empty. Add content to publish.' : 'Publish to LinkedIn'}
         >
           <Share2 className="size-3.5" />
           <span>{activeDraft.status === 'published' ? 'Published' : 'Publish'}</span>
         </Button>
       </div>
+
+      {/* Publish to LinkedIn Handoff Dialog */}
+      <PublishDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen} />
     </header>
   )
 }

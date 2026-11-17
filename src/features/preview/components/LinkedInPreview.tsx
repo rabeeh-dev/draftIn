@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
+import { LINKEDIN_COMPOSE_URL } from './PublishDialog'
 import { formatLinkedInContent } from '../utils/contentRenderer'
-import { convertToLinkedInPublishingText } from '../utils/publishingText'
+import { convertToLinkedInPublishingText, isContentEmpty } from '../utils/publishingText'
+import { copyTextToClipboard } from '../utils/clipboard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +21,7 @@ import {
   Edit3,
   Copy,
   Check,
+  ExternalLink,
 } from 'lucide-react'
 
 export function LinkedInPreview() {
@@ -28,6 +31,7 @@ export function LinkedInPreview() {
   const [copiedPublishText, setCopiedPublishText] = useState(false)
 
   const content = activeDraft?.content || ''
+  const isEmpty = isContentEmpty(content)
 
   // Convert HTML or markdown to native LinkedIn Unicode publishing text
   const publishingText = useMemo(() => {
@@ -40,13 +44,17 @@ export function LinkedInPreview() {
   }, [publishingText])
 
   const handleCopyPublishText = async () => {
-    if (!publishingText) return
-    try {
-      await navigator.clipboard.writeText(publishingText)
+    if (isEmpty || !publishingText) return
+    const success = await copyTextToClipboard(publishingText)
+    if (success) {
       setCopiedPublishText(true)
       setTimeout(() => setCopiedPublishText(false), 2000)
-    } catch {
-      // Fallback
+    }
+  }
+
+  const handleOpenLinkedIn = () => {
+    if (typeof window !== 'undefined') {
+      window.open(LINKEDIN_COMPOSE_URL, '_blank', 'noopener,noreferrer')
     }
   }
 
@@ -120,31 +128,40 @@ export function LinkedInPreview() {
 
           {/* Post Content with Line-Break & Fold Truncation */}
           <div className="px-4 py-2 text-left">
-            <div className="relative">
-              <div
-                className={`transition-all duration-200 ${
-                  !isExpanded && shouldTruncate
-                    ? 'max-h-28 overflow-hidden relative'
-                    : ''
-                }`}
-              >
-                {formatLinkedInContent(content)}
+            {isEmpty ? (
+              <div className="py-7 px-4 text-center border-2 border-dashed border-border/70 rounded-xl my-2 bg-muted/20">
+                <p className="text-xs font-semibold text-foreground">Draft is empty</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Type in the editor to see your LinkedIn live preview.
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <div
+                  className={`transition-all duration-200 ${
+                    !isExpanded && shouldTruncate
+                      ? 'max-h-28 overflow-hidden relative'
+                      : ''
+                  }`}
+                >
+                  {formatLinkedInContent(content)}
 
-                {!isExpanded && shouldTruncate && (
-                  <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent pointer-events-none" />
+                  {!isExpanded && shouldTruncate && (
+                    <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent pointer-events-none" />
+                  )}
+                </div>
+
+                {shouldTruncate && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded((prev) => !prev)}
+                    className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1.5 block cursor-pointer transition-colors"
+                  >
+                    {isExpanded ? 'see less' : '...see more'}
+                  </button>
                 )}
               </div>
-
-              {shouldTruncate && (
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded((prev) => !prev)}
-                  className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1.5 block cursor-pointer transition-colors"
-                >
-                  {isExpanded ? 'see less' : '...see more'}
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Engagement Counters */}
@@ -205,32 +222,71 @@ export function LinkedInPreview() {
         </div>
 
         {/* Copy for LinkedIn Quick Bar */}
-        <div className="w-full max-w-[560px] flex items-center justify-between p-3 rounded-xl border border-border bg-card/60 backdrop-blur-xs text-xs">
+        <div
+          className={`w-full max-w-[560px] flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border gap-2 transition-all text-xs ${
+            copiedPublishText
+              ? 'border-emerald-500/50 bg-emerald-500/10'
+              : 'border-border bg-card/60 backdrop-blur-xs'
+          }`}
+        >
           <div className="flex flex-col">
-            <span className="font-semibold text-foreground">Publishing-Ready Text</span>
+            <span
+              className={`font-semibold ${
+                copiedPublishText
+                  ? 'text-emerald-700 dark:text-emerald-400'
+                  : 'text-foreground'
+              }`}
+            >
+              {copiedPublishText ? 'Copied to Clipboard!' : 'Publishing-Ready Text'}
+            </span>
             <span className="text-[11px] text-muted-foreground">
-              {publishingText.length} characters • Formatted with Unicode Bold & Italic
+              {copiedPublishText
+                ? 'Ready to paste into LinkedIn feed (Ctrl+V / Cmd+V)'
+                : isEmpty
+                ? 'Draft is empty'
+                : `${publishingText.length} characters • Formatted with Unicode Bold & Italic`}
             </span>
           </div>
 
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleCopyPublishText}
-            className="gap-1.5 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white"
-          >
-            {copiedPublishText ? (
-              <>
-                <Check className="size-3.5 text-white" />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="size-3.5" />
-                <span>Copy for LinkedIn</span>
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCopyPublishText}
+              disabled={isEmpty}
+              className={`gap-1.5 transition-all text-white disabled:opacity-50 ${
+                copiedPublishText
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-[#0A66C2] hover:bg-[#0A66C2]/90'
+              }`}
+              title={isEmpty ? 'Draft is empty. Add content before copying.' : 'Copy for LinkedIn'}
+            >
+              {copiedPublishText ? (
+                <>
+                  <Check className="size-3.5 text-white" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5" />
+                  <span>Copy for LinkedIn</span>
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenLinkedIn}
+              disabled={isEmpty}
+              className="gap-1.5 text-xs text-[#0A66C2] border-[#0A66C2]/30 hover:bg-[#0A66C2]/10"
+              title={isEmpty ? 'Draft is empty' : 'Open LinkedIn composer in new tab'}
+            >
+              <ExternalLink className="size-3.5" />
+              <span className="hidden sm:inline">Open LinkedIn</span>
+            </Button>
+          </div>
         </div>
       </div>
 
