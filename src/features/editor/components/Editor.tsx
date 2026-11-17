@@ -1,4 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Link from '@tiptap/extension-link'
+import Placeholder from '@tiptap/extension-placeholder'
+import CharacterCount from '@tiptap/extension-character-count'
 import { useDraftStore } from '@/stores/draft.store'
 import { EditorHeader } from './EditorHeader'
 import { EditorToolbar } from './EditorToolbar'
@@ -11,33 +16,60 @@ export function Editor() {
 
   const LINKEDIN_MAX_CHARS = 3000
 
-  const content = activeDraft?.content || ''
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: { keepMarks: true, keepAttributes: false },
+        orderedList: { keepMarks: true, keepAttributes: false },
+      }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        HTMLAttributes: {
+          class: 'text-[#0A66C2] dark:text-[#70b5f9] underline cursor-pointer font-medium',
+        },
+      }),
+      Placeholder.configure({
+        placeholder: 'What do you want to talk about? Start with a punchy hook...',
+      }),
+      CharacterCount.configure({
+        limit: LINKEDIN_MAX_CHARS,
+      }),
+    ],
+    content: activeDraft?.content || '',
+    editorProps: {
+      attributes: {
+        class: 'tiptap focus:outline-none w-full min-h-[380px] md:min-h-[480px] text-sm md:text-base leading-relaxed text-foreground font-sans prose dark:prose-invert max-w-none',
+      },
+    },
+    onUpdate: ({ editor: currentEditor }) => {
+      if (activeDraft) {
+        // Save editor HTML content to store
+        updateDraft(activeDraft.id, { content: currentEditor.getHTML() })
+      }
+    },
+  })
 
-  const stats = useMemo(() => {
-    const chars = content.length
-    const trimmed = content.trim()
-    const words = trimmed ? trimmed.split(/\s+/).length : 0
-    const lines = content.split('\n').length
-    const readingTimeSeconds = Math.max(5, Math.ceil((words / 200) * 60))
-    const progressPercent = Math.min(100, Math.round((chars / LINKEDIN_MAX_CHARS) * 100))
-    const isOverLimit = chars > LINKEDIN_MAX_CHARS
-
-    // Hook health check (line 1 before first empty line)
-    const firstLine = content.split('\n')[0] || ''
-    const hookLength = firstLine.trim().split(/\s+/).filter(Boolean).length
-    const isGoodHook = hookLength >= 4 && hookLength <= 15
-
-    return {
-      chars,
-      words,
-      lines,
-      readingTimeSeconds,
-      progressPercent,
-      isOverLimit,
-      isGoodHook,
-      firstLine,
+  // Synchronize editor content when selected draft changes
+  useEffect(() => {
+    if (editor && activeDraft) {
+      const currentHTML = editor.getHTML()
+      if (currentHTML !== activeDraft.content) {
+        editor.commands.setContent(activeDraft.content || '', { emitUpdate: false })
+      }
     }
-  }, [content])
+  }, [activeDraft, editor])
+
+  // Direct metrics calculation
+  const chars = editor ? editor.storage.characterCount.characters() : 0
+  const words = editor ? editor.storage.characterCount.words() : 0
+  const progressPercent = Math.min(100, Math.round((chars / LINKEDIN_MAX_CHARS) * 100))
+  const isOverLimit = chars > LINKEDIN_MAX_CHARS
+
+  const text = editor ? editor.getText() : ''
+  const firstLine = text.split('\n')[0] || ''
+  const hookLength = firstLine.trim().split(/\s+/).filter(Boolean).length
+  const isGoodHook = hookLength >= 4 && hookLength <= 15
 
   if (!activeDraft) {
     return (
@@ -56,43 +88,40 @@ export function Editor() {
 
   return (
     <div className="flex h-full flex-col bg-background overflow-hidden flex-1">
-      {/* Top Workspace Header */}
+      {/* Top Workspace Header (Document Title & Layout Switchers) */}
       <EditorHeader />
 
       {/* Formatting & Hooks Toolbar */}
-      <EditorToolbar />
+      <EditorToolbar editor={editor} />
 
-      {/* Main Workspace Body: Split, Editor-Only, or Preview-Only */}
+      {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Editor Typing Area */}
+        {/* Editor Typing Canvas */}
         {editorLayout !== 'preview-only' && (
           <div
             className={`flex flex-col h-full overflow-hidden border-r border-border/80 transition-all ${
               editorLayout === 'split' ? 'w-full lg:w-1/2' : 'w-full'
             }`}
           >
-            {/* Scrollable Text Input */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center">
+            {/* Scrollable Document Canvas */}
+            <div
+              className="flex-1 overflow-y-auto p-4 md:p-8 flex justify-center cursor-text"
+              onClick={() => editor?.commands.focus()}
+            >
               <div className="w-full max-w-2xl flex flex-col gap-3">
-                <textarea
-                  value={activeDraft.content}
-                  onChange={(e) => updateDraft(activeDraft.id, { content: e.target.value })}
-                  placeholder="What do you want to talk about? Start with a punchy hook..."
-                  className="w-full min-h-[380px] md:min-h-[480px] bg-transparent resize-none text-sm md:text-base leading-relaxed text-foreground placeholder:text-muted-foreground/60 outline-none font-sans"
-                  autoFocus
-                />
+                <EditorContent editor={editor} />
               </div>
             </div>
 
-            {/* Bottom Status Bar: Metrics & LinkedIn Progress */}
+            {/* Bottom Status Bar: Character Count, Word Count & Hook Analyzer */}
             <div className="h-10 px-4 border-t border-border/70 bg-card/40 flex items-center justify-between text-xs text-muted-foreground shrink-0 gap-3">
               {/* Hook Health & Advice */}
               <div className="flex items-center gap-2 overflow-hidden truncate">
-                {stats.chars > 0 ? (
-                  stats.isGoodHook ? (
+                {chars > 0 ? (
+                  isGoodHook ? (
                     <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium truncate">
                       <Sparkles className="size-3 shrink-0" />
-                      <span>Hook length looks optimal ({stats.firstLine.slice(0, 30)}...)</span>
+                      <span>Hook length looks optimal ({firstLine.slice(0, 30)}...)</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[11px] font-medium truncate">
@@ -101,28 +130,28 @@ export function Editor() {
                     </div>
                   )
                 ) : (
-                  <span className="text-[11px]">Draft ready</span>
+                  <span className="text-[11px]">Ready to write</span>
                 )}
               </div>
 
-              {/* Character Count & Progress Indicator */}
+              {/* Character & Word Metrics */}
               <div className="flex items-center gap-3 shrink-0 font-medium text-[11px]">
-                <span>{stats.words} words</span>
+                <span>{words} words</span>
                 <span>•</span>
                 <div className="flex items-center gap-1.5">
-                  <span className={stats.isOverLimit ? 'text-destructive font-bold' : ''}>
-                    {stats.chars} / {LINKEDIN_MAX_CHARS}
+                  <span className={isOverLimit ? 'text-destructive font-bold' : ''}>
+                    {chars} / {LINKEDIN_MAX_CHARS}
                   </span>
                   <div className="w-14 h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full transition-all rounded-full ${
-                        stats.isOverLimit
+                        isOverLimit
                           ? 'bg-destructive'
-                          : stats.progressPercent > 80
+                          : progressPercent > 80
                           ? 'bg-amber-500'
                           : 'bg-primary'
                       }`}
-                      style={{ width: `${stats.progressPercent}%` }}
+                      style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                 </div>
