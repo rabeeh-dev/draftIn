@@ -160,6 +160,34 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     fetchDrafts()
   }, [fetchDrafts])
 
+  // Autosave engine: Debounce changes by 1000ms
+  useEffect(() => {
+    if (saveStatus !== 'unsaved' || !activeDraft) return
+
+    const timer = setTimeout(async () => {
+      setSaveStatus('saving')
+      try {
+        draftService.saveBackupDraft(activeDraft)
+        if (user?.id) {
+          const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
+          if (error) {
+            setSaveStatus('error')
+            setSyncError(error.message)
+            return
+          }
+        }
+        setSaveStatus('saved')
+        setLastSavedAt(new Date().toISOString())
+        setSyncError(null)
+      } catch (err) {
+        setSaveStatus('error')
+        setSyncError(err instanceof Error ? err.message : 'Save failed')
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [activeDraft, saveStatus, user?.id])
+
   const createDraft = () => {
     const newId =
       typeof crypto !== 'undefined' && crypto.randomUUID
