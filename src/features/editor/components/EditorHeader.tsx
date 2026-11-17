@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import {
   Menu,
@@ -11,12 +12,19 @@ import {
   Square,
   Eye,
   Share2,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 
 export function EditorHeader() {
+  const { isAuthenticated } = useAuth()
   const {
     activeDraft,
     updateDraft,
+    saveStatus,
+    syncError,
+    retrySync,
     toggleSidebar,
     toggleDraftList,
     isDraftListOpen,
@@ -87,10 +95,45 @@ export function EditorHeader() {
           className="bg-transparent text-sm md:text-base font-bold tracking-tight text-foreground outline-none border-b border-transparent hover:border-border/60 focus:border-primary px-1 py-0.5 rounded transition-all truncate max-w-xs md:max-w-md"
         />
 
-        {/* Saved status indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground ml-1 shrink-0">
-          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Saved</span>
+        {/* Dynamic Save Status Indicator */}
+        <div className="flex items-center ml-1 shrink-0">
+          {saveStatus === 'saving' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+              <Loader2 className="size-3 animate-spin text-blue-500" />
+              <span className="hidden sm:inline">Saving changes...</span>
+              <span className="sm:hidden">Saving...</span>
+            </div>
+          )}
+          {saveStatus === 'unsaved' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+              <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+              <span className="hidden sm:inline">Unsaved changes</span>
+              <span className="sm:hidden">Unsaved</span>
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-destructive font-medium">
+              <AlertCircle className="size-3 text-destructive shrink-0" />
+              <span className="hidden sm:inline">Save failed</span>
+              <button
+                type="button"
+                onClick={() => retrySync()}
+                className="underline hover:text-destructive/80 font-semibold cursor-pointer text-[11px]"
+                title={syncError || 'Click to retry syncing'}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {saveStatus === 'saved' && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <CheckCircle2 className="size-3 text-emerald-500" />
+              <span className="hidden sm:inline">
+                {isAuthenticated ? 'Saved to cloud' : 'Saved locally'}
+              </span>
+              <span className="sm:hidden">Saved</span>
+            </div>
+          )}
         </div>
       </div>
 

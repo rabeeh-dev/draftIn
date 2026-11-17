@@ -1,5 +1,15 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
-import type { Draft, DraftFilter, SortOption, UserProfile } from '@/types'
+import {
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from 'react'
+import type { Draft, DraftFilter, SortOption, UserProfile, SaveStatus } from '@/types'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+import { draftService } from '@/features/drafts/services/draft.service'
 
 const INITIAL_PROFILE: UserProfile = {
   id: 'user-1',
@@ -65,8 +75,16 @@ interface DraftStoreContextType {
   editorLayout: 'split' | 'editor-only' | 'preview-only'
   isSidebarOpen: boolean
   isDraftListOpen: boolean
+  saveStatus: SaveStatus
+  lastSavedAt: string | null
+  syncError: string | null
+  isOnline: boolean
   userProfile: UserProfile
   updateUserProfile: (updated: Partial<UserProfile>) => void
+  setSaveStatus: (status: SaveStatus) => void
+  setLastSavedAt: (timestamp: string | null) => void
+  setSyncError: (error: string | null) => void
+  retrySync: () => Promise<void>
   // Actions
   setActiveDraftId: (id: string | null) => void
   createDraft: () => string
@@ -84,12 +102,17 @@ interface DraftStoreContextType {
   toggleDraftList: () => void
   setIsDraftListOpen: (open: boolean) => void
   setIsLoading: (loading: boolean) => void
+  fetchDrafts: () => Promise<void>
 }
 
 const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
-  const [drafts, setDrafts] = useState<Draft[]>(INITIAL_DRAFTS)
+  const { user } = useAuth()
+  const [drafts, setDrafts] = useState<Draft[]>(() => {
+    const local = draftService.getLocalDrafts()
+    return local.length > 0 ? local : INITIAL_DRAFTS
+  })
   const [activeDraftId, setActiveDraftId] = useState<string | null>('draft-1')
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<DraftFilter>('all')
@@ -99,6 +122,12 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [editorLayout, setEditorLayout] = useState<'split' | 'editor-only' | 'preview-only'>('split')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isDraftListOpen, setIsDraftListOpen] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
 
   const updateUserProfile = (updated: Partial<UserProfile>) => {
@@ -109,8 +138,125 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     return drafts.find((d) => d.id === activeDraftId) || null
   }, [drafts, activeDraftId])
 
+  const fetchDrafts = useCallback(async () => {
+    if (!user?.id) return
+
+    setIsLoading(true)
+    try {
+      const { data, error } = await draftService.fetchDrafts(user.id)
+      if (!error && data && data.length > 0) {
+        setDrafts(data)
+        setActiveDraftId((currentId) => {
+          if (!currentId || !data.some((d) => d.id === currentId)) {
+            return data[0].id
+          }
+          return currentId
+        })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user?.id) return
+    let isCancelled = false
+
+    draftService.fetchDrafts(user.id).then(({ data, error }) => {
+      if (isCancelled || error || !data || data.length === 0) return
+      setDrafts(data)
+      setActiveDraftId((currentId) => {
+        if (!currentId || !data.some((d) => d.id === currentId)) {
+          return data[0].id
+        }
+        return currentId
+      })
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [user])
+
+  // Autosave engine: Debounce changes by 1000ms
+  useEffect(() => {
+    if (saveStatus !== 'unsaved' || !activeDraft) return
+
+    const timer = setTimeout(async () => {
+      setSaveStatus('saving')
+      try {
+        draftService.saveBackupDraft(activeDraft)
+        if (user?.id) {
+          const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
+          if (error) {
+            setSaveStatus('error')
+            setSyncError(error.message)
+            return
+          }
+        }
+        setSaveStatus('saved')
+        setLastSavedAt(new Date().toISOString())
+        setSyncError(null)
+      } catch (err) {
+        setSaveStatus('error')
+        setSyncError(err instanceof Error ? err.message : 'Save failed')
+      }
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [activeDraft, saveStatus, user])
+
+  // Error Recovery: Manual / Automated Sync Retry
+  const retrySync = useCallback(async () => {
+    if (!activeDraft) return
+    setSaveStatus('saving')
+    setSyncError(null)
+
+    try {
+      draftService.saveBackupDraft(activeDraft)
+      if (user?.id) {
+        const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
+        if (error) {
+          setSaveStatus('error')
+          setSyncError(error.message)
+          return
+        }
+      }
+      setSaveStatus('saved')
+      setLastSavedAt(new Date().toISOString())
+      setSyncError(null)
+    } catch (err) {
+      setSaveStatus('error')
+      setSyncError(err instanceof Error ? err.message : 'Retry failed')
+    }
+  }, [activeDraft, user])
+
+  // Error Recovery: Network connectivity listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      retrySync()
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      setSaveStatus('error')
+      setSyncError('Network offline. Changes saved locally to device.')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [retrySync])
+
   const createDraft = () => {
-    const newId = `draft-${Date.now()}`
+    const newId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `draft-${Date.now()}`
     const newDraft: Draft = {
       id: newId,
       title: 'Untitled Draft',
@@ -121,16 +267,28 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setDrafts((prev) => [newDraft, ...prev])
+    setDrafts((prev) => {
+      const next = [newDraft, ...prev]
+      draftService.saveLocalDrafts(next)
+      return next
+    })
     setActiveDraftId(newId)
     // On mobile, automatically show the editor when creating a draft
     setIsDraftListOpen(false)
+
+    // Sync to Supabase if authenticated
+    if (user?.id) {
+      draftService.createDraft(newDraft, user.id).catch((err) => {
+        console.error('Failed to create cloud draft:', err)
+      })
+    }
+
     return newId
   }
 
   const updateDraft = (id: string, updates: Partial<Draft>) => {
-    setDrafts((prev) =>
-      prev.map((d) => {
+    setDrafts((prev) => {
+      const next = prev.map((d) => {
         if (d.id === id) {
           return {
             ...d,
@@ -140,14 +298,26 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         }
         return d
       })
-    )
+      draftService.saveLocalDrafts(next)
+      return next
+    })
+    setSaveStatus('unsaved')
   }
 
   const deleteDraft = (id: string) => {
-    setDrafts((prev) => prev.filter((d) => d.id !== id))
-    if (activeDraftId === id) {
-      const remaining = drafts.filter((d) => d.id !== id)
-      setActiveDraftId(remaining.length > 0 ? remaining[0].id : null)
+    setDrafts((prev) => {
+      const remaining = prev.filter((d) => d.id !== id)
+      draftService.saveLocalDrafts(remaining)
+      if (activeDraftId === id) {
+        setActiveDraftId(remaining.length > 0 ? remaining[0].id : null)
+      }
+      return remaining
+    })
+
+    if (user?.id) {
+      draftService.deleteDraft(id, user.id).catch((err) => {
+        console.error('Failed to delete cloud draft:', err)
+      })
     }
   }
 
@@ -162,14 +332,33 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setDrafts((prev) => [duplicated, ...prev])
+    setDrafts((prev) => {
+      const next = [duplicated, ...prev]
+      draftService.saveLocalDrafts(next)
+      return next
+    })
     setActiveDraftId(duplicated.id)
   }
 
   const toggleStar = (id: string) => {
-    setDrafts((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isStarred: !d.isStarred } : d))
-    )
+    let targetStarred = false
+    setDrafts((prev) => {
+      const next = prev.map((d) => {
+        if (d.id === id) {
+          targetStarred = !d.isStarred
+          return { ...d, isStarred: !d.isStarred, updatedAt: new Date().toISOString() }
+        }
+        return d
+      })
+      draftService.saveLocalDrafts(next)
+      return next
+    })
+
+    if (user?.id) {
+      draftService.updateDraft(id, { isStarred: targetStarred }, user.id).catch((err) => {
+        console.error('Failed to sync star toggle:', err)
+      })
+    }
   }
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev)
@@ -187,8 +376,16 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     editorLayout,
     isSidebarOpen,
     isDraftListOpen,
+    saveStatus,
+    lastSavedAt,
+    syncError,
+    isOnline,
     userProfile,
     updateUserProfile,
+    setSaveStatus,
+    setLastSavedAt,
+    setSyncError,
+    retrySync,
     setActiveDraftId,
     createDraft,
     updateDraft,
@@ -205,6 +402,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     toggleDraftList,
     setIsDraftListOpen,
     setIsLoading,
+    fetchDrafts,
   }
 
   return (

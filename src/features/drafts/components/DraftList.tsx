@@ -35,12 +35,16 @@ export function DraftList() {
 
     // 2. Filter by search query
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
+      const q = searchQuery.toLowerCase().trim()
+      const cleanQ = q.startsWith('#') ? q.slice(1) : q
       result = result.filter(
         (d) =>
           d.title.toLowerCase().includes(q) ||
           d.content.toLowerCase().includes(q) ||
-          d.tags.some((t) => t.toLowerCase().includes(q))
+          d.tags.some((t) => {
+            const tagLower = t.toLowerCase()
+            return tagLower.includes(q) || tagLower.includes(cleanQ)
+          })
       )
     }
 
