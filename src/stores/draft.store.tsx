@@ -109,7 +109,10 @@ const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const [drafts, setDrafts] = useState<Draft[]>(INITIAL_DRAFTS)
+  const [drafts, setDrafts] = useState<Draft[]>(() => {
+    const local = draftService.getLocalDrafts()
+    return local.length > 0 ? local : INITIAL_DRAFTS
+  })
   const [activeDraftId, setActiveDraftId] = useState<string | null>('draft-1')
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<DraftFilter>('all')
@@ -136,13 +139,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   }, [drafts, activeDraftId])
 
   const fetchDrafts = useCallback(async () => {
-    if (!user?.id) {
-      const local = draftService.getLocalDrafts()
-      if (local.length > 0) {
-        setDrafts(local)
-      }
-      return
-    }
+    if (!user?.id) return
 
     setIsLoading(true)
     try {
@@ -159,11 +156,27 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [user?.id])
+  }, [user])
 
   useEffect(() => {
-    fetchDrafts()
-  }, [fetchDrafts])
+    if (!user?.id) return
+    let isCancelled = false
+
+    draftService.fetchDrafts(user.id).then(({ data, error }) => {
+      if (isCancelled || error || !data || data.length === 0) return
+      setDrafts(data)
+      setActiveDraftId((currentId) => {
+        if (!currentId || !data.some((d) => d.id === currentId)) {
+          return data[0].id
+        }
+        return currentId
+      })
+    })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [user])
 
   // Autosave engine: Debounce changes by 1000ms
   useEffect(() => {
@@ -191,7 +204,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     }, 1000)
 
     return () => clearTimeout(timer)
-  }, [activeDraft, saveStatus, user?.id])
+  }, [activeDraft, saveStatus, user])
 
   // Error Recovery: Manual / Automated Sync Retry
   const retrySync = useCallback(async () => {
@@ -216,7 +229,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       setSaveStatus('error')
       setSyncError(err instanceof Error ? err.message : 'Retry failed')
     }
-  }, [activeDraft, user?.id])
+  }, [activeDraft, user])
 
   // Error Recovery: Network connectivity listeners
   useEffect(() => {
