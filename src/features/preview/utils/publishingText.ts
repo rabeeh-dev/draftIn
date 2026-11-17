@@ -48,6 +48,16 @@ export function toUnicodeItalic(text: string): string {
 }
 
 /**
+ * Converts text to Unicode Combining Long Stroke Overlay (Strikethrough).
+ */
+export function toUnicodeStrike(text: string): string {
+  if (!text) return ''
+  return Array.from(text)
+    .map((char) => char + '\u0336')
+    .join('')
+}
+
+/**
  * Checks whether content is considered empty or whitespace only.
  */
 export function isContentEmpty(content?: string | null): boolean {
@@ -140,13 +150,21 @@ export function convertToLinkedInPublishingText(content: string): string {
     return toUnicodeItalic(inner.replace(/<[^>]+>/g, ''))
   })
   // Markdown: *italic* and _italic_ (handling word boundaries)
-  text = text.replace(/(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)/g, '$1$2$3')
-  text = text.replace(/(^|[^\w_])_([^_\n]+)_([^\w_]|$)/g, '$1$2$3')
+  text = text.replace(/(^|[^\w*])\*([^*\n]+)\*([^\w*]|$)/g, (_, before, inner, after) => `${before}${toUnicodeItalic(inner)}${after}`)
+  text = text.replace(/(^|[^\w_])_([^_\n]+)_([^\w_]|$)/g, (_, before, inner, after) => `${before}${toUnicodeItalic(inner)}${after}`)
 
-  // 10. Strip all remaining HTML tags
+  // 10. Convert Strikethrough:
+  // HTML: <s>, <del>, <strike>
+  text = text.replace(/<(s|del|strike)[^>]*>([\s\S]*?)<\/\1>/gi, (_, __, inner) => {
+    return toUnicodeStrike(inner.replace(/<[^>]+>/g, ''))
+  })
+  // Markdown: ~~strikethrough~~
+  text = text.replace(/~~(.*?)~~/g, (_, inner) => toUnicodeStrike(inner))
+
+  // 11. Strip all remaining HTML tags
   text = text.replace(/<[^>]+>/g, '')
 
-  // 11. Decode common HTML entities
+  // 12. Decode common HTML entities
   text = text
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -155,7 +173,7 @@ export function convertToLinkedInPublishingText(content: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
 
-  // 12. Normalize consecutive linebreaks (max 2 consecutive newlines to preserve clean paragraph spacing)
+  // 13. Normalize consecutive linebreaks (max 2 consecutive newlines to preserve clean paragraph spacing)
   text = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n')
 
   return text.trim()

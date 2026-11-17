@@ -27,15 +27,20 @@ export function PublishDialog({ open, onOpenChange }: PublishDialogProps) {
   const isEmpty = isContentEmpty(content)
   const publishingText = convertToLinkedInPublishingText(content)
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setCopied(false)
+      setHasOpenedLinkedIn(false)
+    }
+    onOpenChange(nextOpen)
+  }
+
   // Auto-copy text on dialog open if not empty
   useEffect(() => {
     if (open && !isEmpty && publishingText) {
       copyTextToClipboard(publishingText).then((ok) => {
         if (ok) setCopied(true)
       })
-    } else {
-      setCopied(false)
-      setHasOpenedLinkedIn(false)
     }
   }, [open, isEmpty, publishingText])
 
@@ -58,12 +63,12 @@ export function PublishDialog({ open, onOpenChange }: PublishDialogProps) {
   const handleMarkPublished = () => {
     if (activeDraft) {
       updateDraft(activeDraft.id, { status: 'published' })
-      onOpenChange(false)
+      handleOpenChange(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup className="max-w-md">
         <div className="flex items-center gap-3 pb-1">
           <div className="flex size-10 items-center justify-center rounded-xl bg-[#0A66C2] text-white shadow-xs">
