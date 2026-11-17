@@ -1,6 +1,9 @@
-// Global domain types and interfaces placeholder
-export interface BaseEntity {
+export * from '@/features/drafts/types/draft.types'
+
+export interface UserProfile {
   id: string
-  createdAt: string
-  updatedAt: string
+  name: string
+  headline: string
+  avatarUrl?: string
+  username: string
 }
