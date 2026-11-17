@@ -1,23 +1,23 @@
 /**
- * Converts alphanumeric characters to Unicode Mathematical Bold characters.
- * This allows text to appear bold natively inside LinkedIn post feeds.
+ * Converts alphanumeric characters to Unicode Mathematical Sans-Serif Bold characters.
+ * Matches modern LinkedIn font aesthetics.
  */
 export function toUnicodeBold(text: string): string {
   const chars = Array.from(text)
   return chars
     .map((char) => {
       const code = char.charCodeAt(0)
-      // A-Z (0x1D400 to 0x1D419)
+      // A-Z (0x1D5D4 to 0x1D5ED)
       if (code >= 65 && code <= 90) {
-        return String.fromCodePoint(0x1d400 + (code - 65))
+        return String.fromCodePoint(0x1d5d4 + (code - 65))
       }
-      // a-z (0x1D41A to 0x1D433)
+      // a-z (0x1D5EE to 0x1D607)
       if (code >= 97 && code <= 122) {
-        return String.fromCodePoint(0x1d41a + (code - 97))
+        return String.fromCodePoint(0x1d5ee + (code - 97))
       }
-      // 0-9 (0x1D7CE to 0x1D7D7)
+      // 0-9 (0x1D7EC to 0x1D7F5)
       if (code >= 48 && code <= 57) {
-        return String.fromCodePoint(0x1d7ce + (code - 48))
+        return String.fromCodePoint(0x1d7ec + (code - 48))
       }
       return char
     })
@@ -25,20 +25,20 @@ export function toUnicodeBold(text: string): string {
 }
 
 /**
- * Converts alphanumeric characters to Unicode Mathematical Italic characters.
+ * Converts alphanumeric characters to Unicode Mathematical Sans-Serif Italic characters.
  */
 export function toUnicodeItalic(text: string): string {
   const chars = Array.from(text)
   return chars
     .map((char) => {
       const code = char.charCodeAt(0)
-      // A-Z (0x1D434 to 0x1D44D)
+      // A-Z (0x1D608 to 0x1D621)
       if (code >= 65 && code <= 90) {
-        return String.fromCodePoint(0x1d434 + (code - 65))
+        return String.fromCodePoint(0x1d608 + (code - 65))
       }
-      // a-z (0x1D44E to 0x1D467)
+      // a-z (0x1D622 to 0x1D63B)
       if (code >= 97 && code <= 122) {
-        return String.fromCodePoint(0x1d44e + (code - 97))
+        return String.fromCodePoint(0x1d622 + (code - 97))
       }
       return char
     })
@@ -47,8 +47,8 @@ export function toUnicodeItalic(text: string): string {
 
 /**
  * Transforms Tiptap HTML or markdown into LinkedIn publishing-compatible text.
- * - Converts <strong> and <b> to Unicode Bold.
- * - Converts <em> and <i> to Unicode Italic.
+ * - Converts <strong> and <b> to Unicode Sans-Serif Bold.
+ * - Converts <em> and <i> to Unicode Sans-Serif Italic.
  * - Converts <li> to bulleted points.
  * - Preserves double line-breaks between paragraphs.
  * - Strips residual HTML tags.
