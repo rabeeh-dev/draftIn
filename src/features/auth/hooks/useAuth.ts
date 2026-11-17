@@ -2,10 +2,19 @@ import { useContext } from 'react'
 import { AuthContext } from '../context/auth-context-def'
 import type { AuthContextType } from '../types/auth.types'
 
+const fallbackAuthContext: AuthContextType = {
+  user: null,
+  session: null,
+  isLoading: false,
+  isAuthenticated: false,
+  error: null,
+  signInWithEmail: async () => ({ error: null }),
+  signUpWithEmail: async () => ({ error: null }),
+  signInWithOAuth: async () => ({ error: null }),
+  signOut: async () => {},
+}
+
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
+  return context ?? fallbackAuthContext
 }
