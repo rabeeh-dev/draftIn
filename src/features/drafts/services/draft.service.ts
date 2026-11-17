@@ -3,6 +3,8 @@ import type { Draft } from '../types/draft.types'
 import type { Database } from '@/types/database.types'
 
 type DraftRow = Database['public']['Tables']['drafts']['Row']
+type DraftInsert = Database['public']['Tables']['drafts']['Insert']
+type DraftUpdate = Database['public']['Tables']['drafts']['Update']
 
 const LOCAL_STORAGE_KEY = 'draftin_drafts_v1'
 const LOCAL_BACKUP_KEY = 'draftin_offline_backup'
@@ -23,7 +25,7 @@ export function mapRowToDraft(row: DraftRow): Draft {
 }
 
 // Transform Frontend Draft Model to Supabase DB Insert/Update
-export function mapDraftToRow(draft: Draft, userId: string) {
+export function mapDraftToRow(draft: Draft, userId: string): DraftInsert {
   return {
     id: draft.id,
     user_id: userId,
@@ -152,7 +154,7 @@ export const draftService = {
     }
 
     try {
-      const updatePayload: Record<string, unknown> = {
+      const updatePayload: DraftUpdate = {
         updated_at: new Date().toISOString(),
       }
       if (updates.title !== undefined) updatePayload.title = updates.title

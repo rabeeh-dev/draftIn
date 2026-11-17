@@ -7,7 +7,7 @@ import {
   useEffect,
   type ReactNode,
 } from 'react'
-import type { Draft, DraftFilter, SortOption, UserProfile } from '@/types'
+import type { Draft, DraftFilter, SortOption, UserProfile, SaveStatus } from '@/types'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { draftService } from '@/features/drafts/services/draft.service'
 
@@ -75,8 +75,14 @@ interface DraftStoreContextType {
   editorLayout: 'split' | 'editor-only' | 'preview-only'
   isSidebarOpen: boolean
   isDraftListOpen: boolean
+  saveStatus: SaveStatus
+  lastSavedAt: string | null
+  syncError: string | null
   userProfile: UserProfile
   updateUserProfile: (updated: Partial<UserProfile>) => void
+  setSaveStatus: (status: SaveStatus) => void
+  setLastSavedAt: (timestamp: string | null) => void
+  setSyncError: (error: string | null) => void
   // Actions
   setActiveDraftId: (id: string | null) => void
   createDraft: () => string
@@ -111,6 +117,9 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [editorLayout, setEditorLayout] = useState<'split' | 'editor-only' | 'preview-only'>('split')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isDraftListOpen, setIsDraftListOpen] = useState(true)
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
 
   const updateUserProfile = (updated: Partial<UserProfile>) => {
@@ -186,8 +195,8 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   }
 
   const updateDraft = (id: string, updates: Partial<Draft>) => {
-    setDrafts((prev) =>
-      prev.map((d) => {
+    setDrafts((prev) => {
+      const next = prev.map((d) => {
         if (d.id === id) {
           return {
             ...d,
@@ -197,7 +206,10 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         }
         return d
       })
-    )
+      draftService.saveLocalDrafts(next)
+      return next
+    })
+    setSaveStatus('unsaved')
   }
 
   const deleteDraft = (id: string) => {
@@ -219,14 +231,33 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setDrafts((prev) => [duplicated, ...prev])
+    setDrafts((prev) => {
+      const next = [duplicated, ...prev]
+      draftService.saveLocalDrafts(next)
+      return next
+    })
     setActiveDraftId(duplicated.id)
   }
 
   const toggleStar = (id: string) => {
-    setDrafts((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isStarred: !d.isStarred } : d))
-    )
+    let targetStarred = false
+    setDrafts((prev) => {
+      const next = prev.map((d) => {
+        if (d.id === id) {
+          targetStarred = !d.isStarred
+          return { ...d, isStarred: !d.isStarred, updatedAt: new Date().toISOString() }
+        }
+        return d
+      })
+      draftService.saveLocalDrafts(next)
+      return next
+    })
+
+    if (user?.id) {
+      draftService.updateDraft(id, { isStarred: targetStarred }, user.id).catch((err) => {
+        console.error('Failed to sync star toggle:', err)
+      })
+    }
   }
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev)
@@ -244,8 +275,14 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     editorLayout,
     isSidebarOpen,
     isDraftListOpen,
+    saveStatus,
+    lastSavedAt,
+    syncError,
     userProfile,
     updateUserProfile,
+    setSaveStatus,
+    setLastSavedAt,
+    setSyncError,
     setActiveDraftId,
     createDraft,
     updateDraft,
