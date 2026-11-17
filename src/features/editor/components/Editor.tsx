@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import CharacterCount from '@tiptap/extension-character-count'
 import { useDraftStore } from '@/stores/draft.store'
@@ -21,12 +20,12 @@ export function Editor() {
       StarterKit.configure({
         bulletList: { keepMarks: true, keepAttributes: false },
         orderedList: { keepMarks: true, keepAttributes: false },
-      }),
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        HTMLAttributes: {
-          class: 'text-[#0A66C2] dark:text-[#70b5f9] underline cursor-pointer font-medium',
+        link: {
+          openOnClick: false,
+          autolink: true,
+          HTMLAttributes: {
+            class: 'text-[#0A66C2] dark:text-[#70b5f9] underline cursor-pointer font-medium',
+          },
         },
       }),
       Placeholder.configure({
