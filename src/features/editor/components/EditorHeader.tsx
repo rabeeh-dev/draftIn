@@ -3,6 +3,7 @@ import { useDraftStore } from '@/stores/draft.store'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { convertToLinkedInPublishingText, isContentEmpty } from '@/features/preview/utils/publishingText'
 import { copyTextToClipboard } from '@/features/preview/utils/clipboard'
+import { PublishDialog } from '@/features/preview/components/PublishDialog'
 import { Button } from '@/components/ui/button'
 import {
   Menu,
@@ -35,6 +36,7 @@ export function EditorHeader() {
   } = useDraftStore()
 
   const [copied, setCopied] = useState(false)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
 
   if (!activeDraft) return null
 
@@ -57,11 +59,6 @@ export function EditorHeader() {
       status: nextStatus,
       scheduledFor: nextStatus === 'scheduled' ? 'Tomorrow at 9:00 AM' : undefined,
     })
-  }
-
-  const handlePublishToggle = () => {
-    const nextStatus = activeDraft.status === 'published' ? 'draft' : 'published'
-    updateDraft(activeDraft.id, { status: nextStatus })
   }
 
   return (
@@ -240,15 +237,18 @@ export function EditorHeader() {
         {/* Primary Action: Publish / Share */}
         <Button
           size="sm"
-          onClick={handlePublishToggle}
+          onClick={() => setPublishDialogOpen(true)}
           disabled={isEmpty}
           className="gap-1.5 text-xs h-8 shadow-xs disabled:opacity-50"
-          title={isEmpty ? 'Draft is empty. Add content to publish.' : 'Publish post'}
+          title={isEmpty ? 'Draft is empty. Add content to publish.' : 'Publish to LinkedIn'}
         >
           <Share2 className="size-3.5" />
           <span>{activeDraft.status === 'published' ? 'Published' : 'Publish'}</span>
         </Button>
       </div>
+
+      {/* Publish to LinkedIn Handoff Dialog */}
+      <PublishDialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen} />
     </header>
   )
 }

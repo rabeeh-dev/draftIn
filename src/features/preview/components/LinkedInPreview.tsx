@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
+import { LINKEDIN_COMPOSE_URL } from './PublishDialog'
 import { formatLinkedInContent } from '../utils/contentRenderer'
 import { convertToLinkedInPublishingText, isContentEmpty } from '../utils/publishingText'
 import { copyTextToClipboard } from '../utils/clipboard'
@@ -20,6 +21,7 @@ import {
   Edit3,
   Copy,
   Check,
+  ExternalLink,
 } from 'lucide-react'
 
 export function LinkedInPreview() {
@@ -47,6 +49,12 @@ export function LinkedInPreview() {
     if (success) {
       setCopiedPublishText(true)
       setTimeout(() => setCopiedPublishText(false), 2000)
+    }
+  }
+
+  const handleOpenLinkedIn = () => {
+    if (typeof window !== 'undefined') {
+      window.open(LINKEDIN_COMPOSE_URL, '_blank', 'noopener,noreferrer')
     }
   }
 
@@ -215,7 +223,7 @@ export function LinkedInPreview() {
 
         {/* Copy for LinkedIn Quick Bar */}
         <div
-          className={`w-full max-w-[560px] flex items-center justify-between p-3 rounded-xl border transition-all text-xs ${
+          className={`w-full max-w-[560px] flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border gap-2 transition-all text-xs ${
             copiedPublishText
               ? 'border-emerald-500/50 bg-emerald-500/10'
               : 'border-border bg-card/60 backdrop-blur-xs'
@@ -240,30 +248,45 @@ export function LinkedInPreview() {
             </span>
           </div>
 
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleCopyPublishText}
-            disabled={isEmpty}
-            className={`gap-1.5 transition-all text-white disabled:opacity-50 ${
-              copiedPublishText
-                ? 'bg-emerald-600 hover:bg-emerald-700'
-                : 'bg-[#0A66C2] hover:bg-[#0A66C2]/90'
-            }`}
-            title={isEmpty ? 'Draft is empty. Add content before copying.' : 'Copy for LinkedIn'}
-          >
-            {copiedPublishText ? (
-              <>
-                <Check className="size-3.5 text-white" />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="size-3.5" />
-                <span>Copy for LinkedIn</span>
-              </>
-            )}
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleCopyPublishText}
+              disabled={isEmpty}
+              className={`gap-1.5 transition-all text-white disabled:opacity-50 ${
+                copiedPublishText
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-[#0A66C2] hover:bg-[#0A66C2]/90'
+              }`}
+              title={isEmpty ? 'Draft is empty. Add content before copying.' : 'Copy for LinkedIn'}
+            >
+              {copiedPublishText ? (
+                <>
+                  <Check className="size-3.5 text-white" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5" />
+                  <span>Copy for LinkedIn</span>
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenLinkedIn}
+              disabled={isEmpty}
+              className="gap-1.5 text-xs text-[#0A66C2] border-[#0A66C2]/30 hover:bg-[#0A66C2]/10"
+              title={isEmpty ? 'Draft is empty' : 'Open LinkedIn composer in new tab'}
+            >
+              <ExternalLink className="size-3.5" />
+              <span className="hidden sm:inline">Open LinkedIn</span>
+            </Button>
+          </div>
         </div>
       </div>
 
