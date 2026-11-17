@@ -214,11 +214,27 @@ export function LinkedInPreview() {
         </div>
 
         {/* Copy for LinkedIn Quick Bar */}
-        <div className="w-full max-w-[560px] flex items-center justify-between p-3 rounded-xl border border-border bg-card/60 backdrop-blur-xs text-xs">
+        <div
+          className={`w-full max-w-[560px] flex items-center justify-between p-3 rounded-xl border transition-all text-xs ${
+            copiedPublishText
+              ? 'border-emerald-500/50 bg-emerald-500/10'
+              : 'border-border bg-card/60 backdrop-blur-xs'
+          }`}
+        >
           <div className="flex flex-col">
-            <span className="font-semibold text-foreground">Publishing-Ready Text</span>
+            <span
+              className={`font-semibold ${
+                copiedPublishText
+                  ? 'text-emerald-700 dark:text-emerald-400'
+                  : 'text-foreground'
+              }`}
+            >
+              {copiedPublishText ? 'Copied to Clipboard!' : 'Publishing-Ready Text'}
+            </span>
             <span className="text-[11px] text-muted-foreground">
-              {isEmpty
+              {copiedPublishText
+                ? 'Ready to paste into LinkedIn feed (Ctrl+V / Cmd+V)'
+                : isEmpty
                 ? 'Draft is empty'
                 : `${publishingText.length} characters • Formatted with Unicode Bold & Italic`}
             </span>
@@ -229,7 +245,11 @@ export function LinkedInPreview() {
             size="sm"
             onClick={handleCopyPublishText}
             disabled={isEmpty}
-            className="gap-1.5 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white disabled:opacity-50"
+            className={`gap-1.5 transition-all text-white disabled:opacity-50 ${
+              copiedPublishText
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-[#0A66C2] hover:bg-[#0A66C2]/90'
+            }`}
             title={isEmpty ? 'Draft is empty. Add content before copying.' : 'Copy for LinkedIn'}
           >
             {copiedPublishText ? (

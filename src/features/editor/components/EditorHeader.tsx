@@ -180,24 +180,40 @@ export function EditorHeader() {
           </button>
         </div>
 
+        {/* Copy Feedback Toast Pill */}
+        {copied && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-medium animate-in fade-in zoom-in-95 duration-200"
+          >
+            <Check className="size-3.5" />
+            <span>Ready for LinkedIn!</span>
+          </div>
+        )}
+
         {/* Copy Post Button */}
         <Button
           variant="outline"
           size="sm"
           onClick={handleCopy}
           disabled={isEmpty}
-          className="gap-1.5 text-xs h-8 disabled:opacity-50"
+          className={`gap-1.5 text-xs h-8 disabled:opacity-50 transition-all ${
+            copied
+              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold'
+              : ''
+          }`}
           title={isEmpty ? 'Draft is empty. Write your post before copying.' : 'Copy formatted post to clipboard'}
         >
           {copied ? (
             <>
               <Check className="size-3.5 text-emerald-500" />
-              <span className="hidden sm:inline text-emerald-500 font-medium">Copied!</span>
+              <span>Copied!</span>
             </>
           ) : (
             <>
               <Copy className="size-3.5" />
-              <span className="hidden sm:inline">Copy</span>
+              <span className="hidden sm:inline">Copy Post</span>
             </>
           )}
         </Button>
