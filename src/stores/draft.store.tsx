@@ -213,10 +213,19 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   }
 
   const deleteDraft = (id: string) => {
-    setDrafts((prev) => prev.filter((d) => d.id !== id))
-    if (activeDraftId === id) {
-      const remaining = drafts.filter((d) => d.id !== id)
-      setActiveDraftId(remaining.length > 0 ? remaining[0].id : null)
+    setDrafts((prev) => {
+      const remaining = prev.filter((d) => d.id !== id)
+      draftService.saveLocalDrafts(remaining)
+      if (activeDraftId === id) {
+        setActiveDraftId(remaining.length > 0 ? remaining[0].id : null)
+      }
+      return remaining
+    })
+
+    if (user?.id) {
+      draftService.deleteDraft(id, user.id).catch((err) => {
+        console.error('Failed to delete cloud draft:', err)
+      })
     }
   }
 
