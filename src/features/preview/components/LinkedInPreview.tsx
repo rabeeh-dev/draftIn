@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
+import { formatLinkedInContent } from '../utils/contentRenderer'
+import { convertToLinkedInPublishingText } from '../utils/publishingText'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   Globe,
   MoreHorizontal,
@@ -14,54 +17,37 @@ import {
   Heart,
   Smile,
   Edit3,
+  Copy,
+  Check,
 } from 'lucide-react'
 
 export function LinkedInPreview() {
   const { activeDraft, userProfile, updateUserProfile, previewDevice } = useDraftStore()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showProfileCustomizer, setShowProfileCustomizer] = useState(false)
+  const [copiedPublishText, setCopiedPublishText] = useState(false)
 
   const content = activeDraft?.content || ''
 
-  // Determine if content is HTML from Tiptap or plain text
-  const isHtml = /<[a-z][\s\S]*>/i.test(content)
+  // Convert HTML or markdown to native LinkedIn Unicode publishing text
+  const publishingText = useMemo(() => {
+    return convertToLinkedInPublishingText(content)
+  }, [content])
 
-  // Strip HTML for length calculations
-  const plainText = isHtml
-    ? content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-    : content
+  // Determine if post exceeds fold threshold (~220 chars or > 4 lines)
+  const shouldTruncate = useMemo(() => {
+    return publishingText.length > 220 || publishingText.split('\n').length > 4
+  }, [publishingText])
 
-  const shouldTruncate = plainText.length > 200 || plainText.split('\n').length > 4
-
-  // Render plain text with hashtag/link styling
-  const renderFormattedPlainText = (text: string) => {
-    return text.split('\n').map((line, i) => (
-      <span key={i} className="block min-h-[1.25rem]">
-        {line.split(' ').map((word, wIdx) => {
-          if (word.startsWith('#') && word.length > 1) {
-            return (
-              <span
-                key={wIdx}
-                className="text-[#0A66C2] dark:text-[#70b5f9] hover:underline font-medium cursor-pointer"
-              >
-                {word}{' '}
-              </span>
-            )
-          }
-          if (word.startsWith('http://') || word.startsWith('https://')) {
-            return (
-              <span
-                key={wIdx}
-                className="text-[#0A66C2] dark:text-[#70b5f9] hover:underline cursor-pointer"
-              >
-                {word}{' '}
-              </span>
-            )
-          }
-          return word + ' '
-        })}
-      </span>
-    ))
+  const handleCopyPublishText = async () => {
+    if (!publishingText) return
+    try {
+      await navigator.clipboard.writeText(publishingText)
+      setCopiedPublishText(true)
+      setTimeout(() => setCopiedPublishText(false), 2000)
+    } catch {
+      // Fallback
+    }
   }
 
   return (
@@ -71,7 +57,7 @@ export function LinkedInPreview() {
         onToggleExpanded={() => setIsExpanded((prev) => !prev)}
       />
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 flex items-start justify-center">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center justify-start gap-4">
         {/* Post Card simulating LinkedIn Feed */}
         <div
           className={`w-full rounded-xl border border-border bg-card shadow-sm transition-all overflow-hidden ${
@@ -81,17 +67,17 @@ export function LinkedInPreview() {
           {/* Card Author Header */}
           <div className="flex items-start justify-between p-3.5 pb-2">
             <div className="flex items-start gap-2.5">
-              <Avatar size="default" className="size-11 ring-1 ring-border">
+              <Avatar size="default" className="size-11 ring-1 ring-border shrink-0">
                 <AvatarImage src={userProfile.avatarUrl} alt={userProfile.name} />
                 <AvatarFallback>{userProfile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
 
-              <div className="flex flex-col text-left">
+              <div className="flex flex-col text-left overflow-hidden">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-foreground hover:text-[#0A66C2] hover:underline cursor-pointer leading-tight">
+                  <span className="text-xs font-bold text-foreground hover:text-[#0A66C2] hover:underline cursor-pointer leading-tight truncate">
                     {userProfile.name}
                   </span>
-                  <span className="text-[11px] text-muted-foreground">• 1st</span>
+                  <span className="text-[11px] text-muted-foreground shrink-0">• 1st</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground line-clamp-1 leading-snug">
                   {userProfile.headline}
@@ -99,12 +85,14 @@ export function LinkedInPreview() {
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                   <span>Now</span>
                   <span>•</span>
+                  <span>Edited</span>
+                  <span>•</span>
                   <Globe className="size-2.5" />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 text-muted-foreground">
+            <div className="flex items-center gap-1 text-muted-foreground shrink-0">
               <button
                 type="button"
                 onClick={() => setShowProfileCustomizer(true)}
@@ -130,46 +118,33 @@ export function LinkedInPreview() {
             </div>
           </div>
 
-          {/* Post Content */}
-          <div className="px-4 py-2 text-xs md:text-[13px] leading-relaxed text-foreground text-left break-words">
-            {plainText ? (
-              <div className="relative">
-                <div
-                  className={`transition-all ${
-                    !isExpanded && shouldTruncate
-                      ? 'max-h-28 overflow-hidden relative'
-                      : ''
-                  }`}
-                >
-                  {isHtml ? (
-                    <div
-                      className="prose prose-xs md:prose-sm dark:prose-invert max-w-none [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_a]:text-[#0A66C2] dark:[&_a]:text-[#70b5f9] [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[#0A66C2] [&_blockquote]:pl-2"
-                      dangerouslySetInnerHTML={{ __html: content }}
-                    />
-                  ) : (
-                    <div className="space-y-1">{renderFormattedPlainText(content)}</div>
-                  )}
-
-                  {!isExpanded && shouldTruncate && (
-                    <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-                  )}
-                </div>
+          {/* Post Content with Line-Break & Fold Truncation */}
+          <div className="px-4 py-2 text-left">
+            <div className="relative">
+              <div
+                className={`transition-all duration-200 ${
+                  !isExpanded && shouldTruncate
+                    ? 'max-h-28 overflow-hidden relative'
+                    : ''
+                }`}
+              >
+                {formatLinkedInContent(content)}
 
                 {!isExpanded && shouldTruncate && (
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(true)}
-                    className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1 block"
-                  >
-                    ...see more
-                  </button>
+                  <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent pointer-events-none" />
                 )}
               </div>
-            ) : (
-              <p className="italic text-muted-foreground/60 py-4 text-center">
-                Your LinkedIn post preview will render live here as you write...
-              </p>
-            )}
+
+              {shouldTruncate && (
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded((prev) => !prev)}
+                  className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1.5 block cursor-pointer transition-colors"
+                >
+                  {isExpanded ? 'see less' : '...see more'}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Engagement Counters */}
@@ -227,6 +202,35 @@ export function LinkedInPreview() {
               <span className="hidden sm:inline text-[11px]">Send</span>
             </button>
           </div>
+        </div>
+
+        {/* Copy for LinkedIn Quick Bar */}
+        <div className="w-full max-w-[560px] flex items-center justify-between p-3 rounded-xl border border-border bg-card/60 backdrop-blur-xs text-xs">
+          <div className="flex flex-col">
+            <span className="font-semibold text-foreground">Publishing-Ready Text</span>
+            <span className="text-[11px] text-muted-foreground">
+              {publishingText.length} characters • Formatted with Unicode Bold & Italic
+            </span>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleCopyPublishText}
+            className="gap-1.5 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white"
+          >
+            {copiedPublishText ? (
+              <>
+                <Check className="size-3.5 text-white" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="size-3.5" />
+                <span>Copy for LinkedIn</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
