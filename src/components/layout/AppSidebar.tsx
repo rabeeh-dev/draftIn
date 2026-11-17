@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+import { AuthModal } from '@/features/auth/components/AuthModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -17,10 +20,14 @@ import {
   ChevronLeft,
   X,
   Feather,
+  LogIn,
+  LogOut,
 } from 'lucide-react'
 import type { DraftFilter } from '@/types'
 
 export function AppSidebar() {
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const { user, isAuthenticated, signOut } = useAuth()
   const {
     drafts,
     filter,
@@ -247,28 +254,66 @@ export function AppSidebar() {
             {isSidebarOpen && <span className="flex-1 text-left">Trash</span>}
           </button>
 
-          <div
-            className={`flex items-center gap-2.5 p-2 rounded-xl bg-sidebar-accent/40 border border-sidebar-border mt-2 ${
-              !isSidebarOpen ? 'justify-center p-1.5' : ''
-            }`}
-          >
-            <Avatar size="sm">
-              <AvatarImage src={userProfile.avatarUrl} alt={userProfile.name} />
-              <AvatarFallback>{userProfile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-            {isSidebarOpen && (
-              <div className="flex-1 overflow-hidden text-left">
-                <p className="truncate text-xs font-semibold text-foreground leading-none">
-                  {userProfile.name}
-                </p>
-                <p className="truncate text-[10px] text-muted-foreground mt-0.5">
-                  Pro Plan • 12/50 Posts
-                </p>
+          {isAuthenticated ? (
+            <div
+              className={`flex items-center gap-2 p-2 rounded-xl bg-sidebar-accent/50 border border-sidebar-border mt-2 ${
+                !isSidebarOpen ? 'justify-center p-1.5' : ''
+              }`}
+            >
+              <Avatar size="sm">
+                <AvatarImage
+                  src={user?.user_metadata?.avatar_url || userProfile.avatarUrl}
+                  alt={user?.user_metadata?.full_name || userProfile.name}
+                />
+                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                  {(user?.email?.[0] || userProfile.name.slice(0, 1) || 'U').toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              {isSidebarOpen && (
+                <div className="flex-1 overflow-hidden text-left">
+                  <p className="truncate text-xs font-semibold text-foreground leading-none">
+                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
+                  </p>
+                  <p className="truncate text-[10px] text-muted-foreground mt-0.5">
+                    {user?.email}
+                  </p>
+                </div>
+              )}
+              {isSidebarOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => signOut()}
+                  className="text-muted-foreground hover:text-destructive shrink-0"
+                  title="Sign out"
+                >
+                  <LogOut className="size-3.5" />
+                </Button>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className={`flex w-full items-center gap-2 p-2 rounded-xl bg-sidebar-accent/40 hover:bg-sidebar-accent border border-sidebar-border mt-2 transition-colors text-left ${
+                !isSidebarOpen ? 'justify-center p-1.5' : ''
+              }`}
+              title="Sign in with Supabase"
+            >
+              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                <LogIn className="size-3.5" />
               </div>
-            )}
-          </div>
+              {isSidebarOpen && (
+                <div className="flex-1 overflow-hidden">
+                  <p className="truncate text-xs font-medium text-foreground">Sign In / Register</p>
+                  <p className="truncate text-[10px] text-muted-foreground">Sync cloud drafts</p>
+                </div>
+              )}
+            </button>
+          )}
         </div>
       </aside>
+
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
     </>
   )
 }
