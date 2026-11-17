@@ -66,6 +66,7 @@ interface DraftStoreContextType {
   isSidebarOpen: boolean
   isDraftListOpen: boolean
   userProfile: UserProfile
+  updateUserProfile: (updated: Partial<UserProfile>) => void
   // Actions
   setActiveDraftId: (id: string | null) => void
   createDraft: () => string
@@ -98,7 +99,11 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [editorLayout, setEditorLayout] = useState<'split' | 'editor-only' | 'preview-only'>('split')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isDraftListOpen, setIsDraftListOpen] = useState(true)
-  const [userProfile] = useState<UserProfile>(INITIAL_PROFILE)
+  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
+
+  const updateUserProfile = (updated: Partial<UserProfile>) => {
+    setUserProfile((prev) => ({ ...prev, ...updated }))
+  }
 
   const activeDraft = useMemo(() => {
     return drafts.find((d) => d.id === activeDraftId) || null
@@ -183,6 +188,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     isSidebarOpen,
     isDraftListOpen,
     userProfile,
+    updateUserProfile,
     setActiveDraftId,
     createDraft,
     updateDraft,

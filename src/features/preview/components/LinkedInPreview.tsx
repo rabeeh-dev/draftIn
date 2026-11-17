@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { PreviewHeader } from './PreviewHeader'
+import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Globe,
@@ -12,11 +13,13 @@ import {
   Send,
   Heart,
   Smile,
+  Edit3,
 } from 'lucide-react'
 
 export function LinkedInPreview() {
-  const { activeDraft, userProfile, previewDevice } = useDraftStore()
+  const { activeDraft, userProfile, updateUserProfile, previewDevice } = useDraftStore()
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showProfileCustomizer, setShowProfileCustomizer] = useState(false)
 
   const content = activeDraft?.content || ''
 
@@ -102,6 +105,14 @@ export function LinkedInPreview() {
             </div>
 
             <div className="flex items-center gap-1 text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => setShowProfileCustomizer(true)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-md transition-colors"
+                title="Edit author profile"
+              >
+                <Edit3 className="size-3.5" />
+              </button>
               <button
                 type="button"
                 className="hidden sm:flex items-center gap-1 text-xs font-semibold text-[#0A66C2] hover:bg-[#0A66C2]/10 px-2 py-1 rounded-md transition-colors"
@@ -218,6 +229,13 @@ export function LinkedInPreview() {
           </div>
         </div>
       </div>
+
+      <ProfileCustomizerDialog
+        open={showProfileCustomizer}
+        onOpenChange={setShowProfileCustomizer}
+        profile={userProfile}
+        onSave={(updated) => updateUserProfile(updated)}
+      />
     </div>
   )
 }
