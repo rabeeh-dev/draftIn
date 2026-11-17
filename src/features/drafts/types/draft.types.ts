@@ -1,5 +1,7 @@
 export type DraftStatus = 'draft' | 'scheduled' | 'published'
 
+export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error'
+
 export interface Draft {
   id: string
   title: string

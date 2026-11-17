@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
 import type { Draft, DraftFilter, SortOption, UserProfile } from '@/types'
+import { useAuth } from '@/features/auth/hooks/useAuth'
+import { draftService } from '@/features/drafts/services/draft.service'
 
 const INITIAL_PROFILE: UserProfile = {
   id: 'user-1',
@@ -89,6 +91,7 @@ interface DraftStoreContextType {
 const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [drafts, setDrafts] = useState<Draft[]>(INITIAL_DRAFTS)
   const [activeDraftId, setActiveDraftId] = useState<string | null>('draft-1')
   const [searchQuery, setSearchQuery] = useState('')
@@ -110,7 +113,10 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   }, [drafts, activeDraftId])
 
   const createDraft = () => {
-    const newId = `draft-${Date.now()}`
+    const newId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `draft-${Date.now()}`
     const newDraft: Draft = {
       id: newId,
       title: 'Untitled Draft',
@@ -121,10 +127,22 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setDrafts((prev) => [newDraft, ...prev])
+    setDrafts((prev) => {
+      const next = [newDraft, ...prev]
+      draftService.saveLocalDrafts(next)
+      return next
+    })
     setActiveDraftId(newId)
     // On mobile, automatically show the editor when creating a draft
     setIsDraftListOpen(false)
+
+    // Sync to Supabase if authenticated
+    if (user?.id) {
+      draftService.createDraft(newDraft, user.id).catch((err) => {
+        console.error('Failed to create cloud draft:', err)
+      })
+    }
+
     return newId
   }
 
