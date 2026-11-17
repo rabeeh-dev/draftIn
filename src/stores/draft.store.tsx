@@ -78,11 +78,13 @@ interface DraftStoreContextType {
   saveStatus: SaveStatus
   lastSavedAt: string | null
   syncError: string | null
+  isOnline: boolean
   userProfile: UserProfile
   updateUserProfile: (updated: Partial<UserProfile>) => void
   setSaveStatus: (status: SaveStatus) => void
   setLastSavedAt: (timestamp: string | null) => void
   setSyncError: (error: string | null) => void
+  retrySync: () => Promise<void>
   // Actions
   setActiveDraftId: (id: string | null) => void
   createDraft: () => string
@@ -120,6 +122,9 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState<boolean>(
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
 
   const updateUserProfile = (updated: Partial<UserProfile>) => {
@@ -187,6 +192,52 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
 
     return () => clearTimeout(timer)
   }, [activeDraft, saveStatus, user?.id])
+
+  // Error Recovery: Manual / Automated Sync Retry
+  const retrySync = useCallback(async () => {
+    if (!activeDraft) return
+    setSaveStatus('saving')
+    setSyncError(null)
+
+    try {
+      draftService.saveBackupDraft(activeDraft)
+      if (user?.id) {
+        const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
+        if (error) {
+          setSaveStatus('error')
+          setSyncError(error.message)
+          return
+        }
+      }
+      setSaveStatus('saved')
+      setLastSavedAt(new Date().toISOString())
+      setSyncError(null)
+    } catch (err) {
+      setSaveStatus('error')
+      setSyncError(err instanceof Error ? err.message : 'Retry failed')
+    }
+  }, [activeDraft, user?.id])
+
+  // Error Recovery: Network connectivity listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      retrySync()
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      setSaveStatus('error')
+      setSyncError('Network offline. Changes saved locally to device.')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [retrySync])
 
   const createDraft = () => {
     const newId =
@@ -315,11 +366,13 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     saveStatus,
     lastSavedAt,
     syncError,
+    isOnline,
     userProfile,
     updateUserProfile,
     setSaveStatus,
     setLastSavedAt,
     setSyncError,
+    retrySync,
     setActiveDraftId,
     createDraft,
     updateDraft,

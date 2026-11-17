@@ -23,6 +23,8 @@ export function EditorHeader() {
     activeDraft,
     updateDraft,
     saveStatus,
+    syncError,
+    retrySync,
     toggleSidebar,
     toggleDraftList,
     isDraftListOpen,
@@ -110,10 +112,17 @@ export function EditorHeader() {
             </div>
           )}
           {saveStatus === 'error' && (
-            <div className="flex items-center gap-1 text-[11px] text-destructive font-medium">
-              <AlertCircle className="size-3 text-destructive" />
+            <div className="flex items-center gap-1.5 text-[11px] text-destructive font-medium">
+              <AlertCircle className="size-3 text-destructive shrink-0" />
               <span className="hidden sm:inline">Save failed</span>
-              <span className="sm:hidden">Error</span>
+              <button
+                type="button"
+                onClick={() => retrySync()}
+                className="underline hover:text-destructive/80 font-semibold cursor-pointer text-[11px]"
+                title={syncError || 'Click to retry syncing'}
+              >
+                Retry
+              </button>
             </div>
           )}
           {saveStatus === 'saved' && (
