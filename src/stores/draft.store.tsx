@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from 'react'
 import type { Draft, DraftFilter, SortOption, UserProfile } from '@/types'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { draftService } from '@/features/drafts/services/draft.service'
@@ -86,6 +94,7 @@ interface DraftStoreContextType {
   toggleDraftList: () => void
   setIsDraftListOpen: (open: boolean) => void
   setIsLoading: (loading: boolean) => void
+  fetchDrafts: () => Promise<void>
 }
 
 const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
@@ -111,6 +120,36 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const activeDraft = useMemo(() => {
     return drafts.find((d) => d.id === activeDraftId) || null
   }, [drafts, activeDraftId])
+
+  const fetchDrafts = useCallback(async () => {
+    if (!user?.id) {
+      const local = draftService.getLocalDrafts()
+      if (local.length > 0) {
+        setDrafts(local)
+      }
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const { data, error } = await draftService.fetchDrafts(user.id)
+      if (!error && data && data.length > 0) {
+        setDrafts(data)
+        setActiveDraftId((currentId) => {
+          if (!currentId || !data.some((d) => d.id === currentId)) {
+            return data[0].id
+          }
+          return currentId
+        })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    fetchDrafts()
+  }, [fetchDrafts])
 
   const createDraft = () => {
     const newId =
@@ -223,6 +262,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     toggleDraftList,
     setIsDraftListOpen,
     setIsLoading,
+    fetchDrafts,
   }
 
   return (
