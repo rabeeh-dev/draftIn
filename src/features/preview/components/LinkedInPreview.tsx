@@ -3,7 +3,7 @@ import { useDraftStore } from '@/stores/draft.store'
 import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
 import { formatLinkedInContent } from '../utils/contentRenderer'
-import { convertToLinkedInPublishingText } from '../utils/publishingText'
+import { convertToLinkedInPublishingText, isContentEmpty } from '../utils/publishingText'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,6 +28,7 @@ export function LinkedInPreview() {
   const [copiedPublishText, setCopiedPublishText] = useState(false)
 
   const content = activeDraft?.content || ''
+  const isEmpty = isContentEmpty(content)
 
   // Convert HTML or markdown to native LinkedIn Unicode publishing text
   const publishingText = useMemo(() => {
@@ -40,7 +41,7 @@ export function LinkedInPreview() {
   }, [publishingText])
 
   const handleCopyPublishText = async () => {
-    if (!publishingText) return
+    if (isEmpty || !publishingText) return
     try {
       await navigator.clipboard.writeText(publishingText)
       setCopiedPublishText(true)
@@ -120,31 +121,40 @@ export function LinkedInPreview() {
 
           {/* Post Content with Line-Break & Fold Truncation */}
           <div className="px-4 py-2 text-left">
-            <div className="relative">
-              <div
-                className={`transition-all duration-200 ${
-                  !isExpanded && shouldTruncate
-                    ? 'max-h-28 overflow-hidden relative'
-                    : ''
-                }`}
-              >
-                {formatLinkedInContent(content)}
+            {isEmpty ? (
+              <div className="py-7 px-4 text-center border-2 border-dashed border-border/70 rounded-xl my-2 bg-muted/20">
+                <p className="text-xs font-semibold text-foreground">Draft is empty</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Type in the editor to see your LinkedIn live preview.
+                </p>
+              </div>
+            ) : (
+              <div className="relative">
+                <div
+                  className={`transition-all duration-200 ${
+                    !isExpanded && shouldTruncate
+                      ? 'max-h-28 overflow-hidden relative'
+                      : ''
+                  }`}
+                >
+                  {formatLinkedInContent(content)}
 
-                {!isExpanded && shouldTruncate && (
-                  <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent pointer-events-none" />
+                  {!isExpanded && shouldTruncate && (
+                    <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-card via-card/80 to-transparent pointer-events-none" />
+                  )}
+                </div>
+
+                {shouldTruncate && (
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded((prev) => !prev)}
+                    className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1.5 block cursor-pointer transition-colors"
+                  >
+                    {isExpanded ? 'see less' : '...see more'}
+                  </button>
                 )}
               </div>
-
-              {shouldTruncate && (
-                <button
-                  type="button"
-                  onClick={() => setIsExpanded((prev) => !prev)}
-                  className="text-[12px] font-semibold text-muted-foreground hover:text-[#0A66C2] hover:underline mt-1.5 block cursor-pointer transition-colors"
-                >
-                  {isExpanded ? 'see less' : '...see more'}
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Engagement Counters */}
@@ -209,7 +219,9 @@ export function LinkedInPreview() {
           <div className="flex flex-col">
             <span className="font-semibold text-foreground">Publishing-Ready Text</span>
             <span className="text-[11px] text-muted-foreground">
-              {publishingText.length} characters • Formatted with Unicode Bold & Italic
+              {isEmpty
+                ? 'Draft is empty'
+                : `${publishingText.length} characters • Formatted with Unicode Bold & Italic`}
             </span>
           </div>
 
@@ -217,7 +229,9 @@ export function LinkedInPreview() {
             type="button"
             size="sm"
             onClick={handleCopyPublishText}
-            className="gap-1.5 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white"
+            disabled={isEmpty}
+            className="gap-1.5 bg-[#0A66C2] hover:bg-[#0A66C2]/90 text-white disabled:opacity-50"
+            title={isEmpty ? 'Draft is empty. Add content before copying.' : 'Copy for LinkedIn'}
           >
             {copiedPublishText ? (
               <>

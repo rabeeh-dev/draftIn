@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { convertToLinkedInPublishingText, isContentEmpty } from '@/features/preview/utils/publishingText'
 import { Button } from '@/components/ui/button'
 import {
   Menu,
@@ -36,10 +37,14 @@ export function EditorHeader() {
 
   if (!activeDraft) return null
 
+  const isEmpty = isContentEmpty(activeDraft.content)
+
   const handleCopy = async () => {
-    if (!activeDraft.content) return
+    if (isEmpty) return
+    const publishingText = convertToLinkedInPublishingText(activeDraft.content)
+    if (!publishingText) return
     try {
-      await navigator.clipboard.writeText(activeDraft.content)
+      await navigator.clipboard.writeText(publishingText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -181,8 +186,9 @@ export function EditorHeader() {
           variant="outline"
           size="sm"
           onClick={handleCopy}
-          className="gap-1.5 text-xs h-8"
-          title="Copy formatted post to clipboard"
+          disabled={isEmpty}
+          className="gap-1.5 text-xs h-8 disabled:opacity-50"
+          title={isEmpty ? 'Draft is empty. Write your post before copying.' : 'Copy formatted post to clipboard'}
         >
           {copied ? (
             <>
@@ -202,12 +208,13 @@ export function EditorHeader() {
           variant="outline"
           size="sm"
           onClick={handleScheduleToggle}
-          className={`gap-1.5 text-xs h-8 ${
+          disabled={isEmpty}
+          className={`gap-1.5 text-xs h-8 disabled:opacity-50 ${
             activeDraft.status === 'scheduled'
               ? 'border-amber-500/40 text-amber-600 bg-amber-500/10'
               : ''
           }`}
-          title="Schedule post"
+          title={isEmpty ? 'Draft is empty. Add content to schedule.' : 'Schedule post'}
         >
           <Calendar className="size-3.5" />
           <span className="hidden sm:inline">
@@ -219,7 +226,9 @@ export function EditorHeader() {
         <Button
           size="sm"
           onClick={handlePublishToggle}
-          className="gap-1.5 text-xs h-8 shadow-xs"
+          disabled={isEmpty}
+          className="gap-1.5 text-xs h-8 shadow-xs disabled:opacity-50"
+          title={isEmpty ? 'Draft is empty. Add content to publish.' : 'Publish post'}
         >
           <Share2 className="size-3.5" />
           <span>{activeDraft.status === 'published' ? 'Published' : 'Publish'}</span>
