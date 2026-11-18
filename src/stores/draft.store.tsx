@@ -80,6 +80,8 @@ interface DraftStoreContextType {
   syncError: string | null
   isOnline: boolean
   userProfile: UserProfile
+  currentView: 'workspace' | 'login' | 'admin'
+  setCurrentView: (view: 'workspace' | 'login' | 'admin') => void
   updateUserProfile: (updated: Partial<UserProfile>) => void
   setSaveStatus: (status: SaveStatus) => void
   setLastSavedAt: (timestamp: string | null) => void
@@ -129,6 +131,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
+  const [currentView, setCurrentView] = useState<'workspace' | 'login' | 'admin'>('workspace')
 
   const updateUserProfile = (updated: Partial<UserProfile>) => {
     setUserProfile((prev) => ({ ...prev, ...updated }))
@@ -381,6 +384,8 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     syncError,
     isOnline,
     userProfile,
+    currentView,
+    setCurrentView,
     updateUserProfile,
     setSaveStatus,
     setLastSavedAt,

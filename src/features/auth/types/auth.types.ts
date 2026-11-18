@@ -15,5 +15,6 @@ export interface AuthContextType {
     fullName?: string
   ) => Promise<{ error: AuthError | null }>
   signInWithOAuth: (provider: 'linkedin_oidc' | 'google' | 'github') => Promise<{ error: AuthError | null }>
+  signInWithGoogle: () => Promise<{ error: AuthError | null }>
   signOut: () => Promise<void>
 }

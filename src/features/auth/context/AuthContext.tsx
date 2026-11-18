@@ -65,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: oAuthError }
   }
 
+  const signInWithGoogle = async () => {
+    return signInWithOAuth('google')
+  }
+
   const signOut = async () => {
     await authService.signOut()
     setSession(null)
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithEmail,
     signUpWithEmail,
     signInWithOAuth,
+    signInWithGoogle,
     signOut,
   }
 

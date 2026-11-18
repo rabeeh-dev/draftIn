@@ -11,6 +11,7 @@ const fallbackAuthContext: AuthContextType = {
   signInWithEmail: async () => ({ error: null }),
   signUpWithEmail: async () => ({ error: null }),
   signInWithOAuth: async () => ({ error: null }),
+  signInWithGoogle: async () => ({ error: null }),
   signOut: async () => {},
 }
 

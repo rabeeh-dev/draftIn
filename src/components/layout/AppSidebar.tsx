@@ -37,6 +37,7 @@ export function AppSidebar() {
     toggleSidebar,
     setIsSidebarOpen,
     userProfile,
+    setCurrentView,
   } = useDraftStore()
 
   const counts = {
@@ -255,60 +256,98 @@ export function AppSidebar() {
           </button>
 
           {isAuthenticated ? (
-            <div
-              className={`flex items-center gap-2 p-2 rounded-xl bg-sidebar-accent/50 border border-sidebar-border mt-2 ${
-                !isSidebarOpen ? 'justify-center p-1.5' : ''
-              }`}
-            >
-              <Avatar size="sm">
-                <AvatarImage
-                  src={user?.user_metadata?.avatar_url || userProfile.avatarUrl}
-                  alt={user?.user_metadata?.full_name || userProfile.name}
-                />
-                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                  {(user?.email?.[0] || userProfile.name.slice(0, 1) || 'U').toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {isSidebarOpen && (
-                <div className="flex-1 overflow-hidden text-left">
-                  <p className="truncate text-xs font-semibold text-foreground leading-none">
-                    {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
-                  </p>
-                  <p className="truncate text-[10px] text-muted-foreground mt-0.5">
-                    {user?.email}
-                  </p>
-                </div>
-              )}
-              {isSidebarOpen && (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={() => signOut()}
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  title="Sign out"
-                >
-                  <LogOut className="size-3.5" />
-                </Button>
-              )}
+            <div className="space-y-1.5 mt-2">
+              <div
+                className={`flex items-center gap-2 p-2 rounded-xl bg-sidebar-accent/50 border border-sidebar-border ${
+                  !isSidebarOpen ? 'justify-center p-1.5' : ''
+                }`}
+              >
+                <Avatar size="sm">
+                  <AvatarImage
+                    src={user?.user_metadata?.avatar_url || userProfile.avatarUrl}
+                    alt={user?.user_metadata?.full_name || userProfile.name}
+                  />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                    {(user?.email?.[0] || userProfile.name.slice(0, 1) || 'U').toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {isSidebarOpen && (
+                  <div className="flex-1 overflow-hidden text-left cursor-pointer" onClick={() => setCurrentView('login')}>
+                    <p className="truncate text-xs font-semibold text-foreground leading-none hover:underline">
+                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
+                    </p>
+                    <p className="truncate text-[10px] text-muted-foreground mt-0.5">
+                      {user?.email}
+                    </p>
+                  </div>
+                )}
+                {isSidebarOpen && (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => signOut()}
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    title="Sign out"
+                  >
+                    <LogOut className="size-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
           ) : (
-            <button
-              onClick={() => setAuthModalOpen(true)}
-              className={`flex w-full items-center gap-2 p-2 rounded-xl bg-sidebar-accent/40 hover:bg-sidebar-accent border border-sidebar-border mt-2 transition-colors text-left ${
-                !isSidebarOpen ? 'justify-center p-1.5' : ''
-              }`}
-              title="Sign in with Supabase"
-            >
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
-                <LogIn className="size-3.5" />
-              </div>
-              {isSidebarOpen && (
-                <div className="flex-1 overflow-hidden">
-                  <p className="truncate text-xs font-medium text-foreground">Sign In / Register</p>
-                  <p className="truncate text-[10px] text-muted-foreground">Sync cloud drafts</p>
+            <div className="space-y-1 mt-2">
+              <button
+                type="button"
+                onClick={() => setCurrentView('login')}
+                className={`flex w-full items-center gap-2 p-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all text-left shadow-2xs ${
+                  !isSidebarOpen ? 'justify-center p-1.5' : ''
+                }`}
+                title="Sign in with Google"
+              >
+                <div className="flex size-7 items-center justify-center rounded-lg bg-background text-foreground shrink-0 shadow-2xs">
+                  <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
                 </div>
-              )}
-            </button>
+                {isSidebarOpen && (
+                  <div className="flex-1 overflow-hidden">
+                    <p className="truncate text-xs font-semibold leading-tight">Google Sign In</p>
+                    <p className="truncate text-[10px] text-primary-foreground/75 leading-tight">Sync cloud drafts</p>
+                  </div>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className={`flex w-full items-center gap-2 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 text-left transition-colors ${
+                  !isSidebarOpen ? 'justify-center p-1' : ''
+                }`}
+                title="Sign in with Supabase"
+              >
+                <div className="flex size-5 items-center justify-center rounded text-muted-foreground shrink-0">
+                  <LogIn className="size-3" />
+                </div>
+                {isSidebarOpen && (
+                  <span className="truncate text-[11px]">Sign In / Register</span>
+                )}
+              </button>
+            </div>
           )}
         </div>
       </aside>

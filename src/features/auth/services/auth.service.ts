@@ -54,6 +54,10 @@ export const authService = {
     return { error }
   },
 
+  async signInWithGoogle(): Promise<{ error: AuthError | null }> {
+    return this.signInWithOAuth('google')
+  },
+
   async signOut(): Promise<{ error: AuthError | null }> {
     if (!isSupabaseConfigured) return { error: null }
     const { error } = await supabase.auth.signOut()
