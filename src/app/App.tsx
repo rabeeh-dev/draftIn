@@ -2,6 +2,7 @@ import { Providers } from './providers'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Editor } from '@/features/editor/components/Editor'
 import { LoginPage } from '@/features/auth/components/LoginPage'
+import { AdminPanel } from '@/features/admin/components/AdminPanel'
 import { useDraftStore } from '@/stores/draft.store'
 
 function AppContent() {
@@ -9,6 +10,10 @@ function AppContent() {
 
   if (currentView === 'login') {
     return <LoginPage onBack={() => setCurrentView('workspace')} />
+  }
+
+  if (currentView === 'admin') {
+    return <AdminPanel onBack={() => setCurrentView('workspace')} />
   }
 
   return (
