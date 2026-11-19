@@ -85,6 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  const cacheUserMetadata = (u: User | null) => {
+    if (!u || typeof localStorage === 'undefined') return
+    try {
+      const avatar =
+        u.user_metadata?.avatar_url ||
+        u.user_metadata?.picture ||
+        u.user_metadata?.avatar ||
+        ''
+      const name =
+        u.user_metadata?.full_name ||
+        u.user_metadata?.name ||
+        u.email?.split('@')[0] ||
+        ''
+      if (avatar) localStorage.setItem('draftin_last_avatar_url', avatar)
+      if (name) localStorage.setItem('draftin_last_name', name)
+      localStorage.setItem('draftin_last_user_id', u.id)
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
   useEffect(() => {
     if (!isSupabaseConfigured) return
 
@@ -93,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (sessionError) setError(sessionError)
       setSession(data.session)
       setUser(data.session?.user ?? null)
+      cacheUserMetadata(data.session?.user ?? null)
       setIsLoading(false)
     })
 
@@ -102,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
+      cacheUserMetadata(currentSession?.user ?? null)
       setIsLoading(false)
     })
 
@@ -156,6 +179,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('draftin_last_avatar_url')
+        localStorage.removeItem('draftin_last_name')
+        localStorage.removeItem('draftin_last_user_id')
+        localStorage.removeItem('draftin_last_headline')
+      }
+    } catch {
+      // Ignore
+    }
     await authService.signOut()
     setSession(null)
     setUser(null)

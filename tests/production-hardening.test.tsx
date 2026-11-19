@@ -11,6 +11,8 @@ import { checkSystemHealth } from '@/lib/health'
 import { logger } from '@/lib/logger'
 import { adminAuthService } from '@/features/admin/services/admin-auth.service'
 import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
+import { LinkedInPreview } from '@/features/preview/components/LinkedInPreview'
+import { DraftStoreProvider } from '@/stores/draft.store'
 import type { Database } from '@/types/database.types'
 
 type DraftRow = Database['public']['Tables']['drafts']['Row']
@@ -265,6 +267,41 @@ describe('Phase 08-14: Production Hardening, Security & Reliability', () => {
       expect(screen.getByPlaceholderText(/enter administrator password/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /sign in as administrator/i })).toBeInTheDocument()
       expect(screen.getByText(/return to writer workspace/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('Instant Zero-Latency LinkedIn Preview Avatar Rendering', () => {
+    it('renders the user avatar image with no-referrer policy and synchronous fast cache', () => {
+      localStorage.setItem('draftin_last_avatar_url', 'https://lh3.googleusercontent.com/a/test-avatar-123')
+      localStorage.setItem('draftin_last_name', 'Sarah Connor')
+
+      render(
+        <AuthContext.Provider
+          value={createMockAuth({
+            user: {
+              id: 'usr-sarah-1',
+              email: 'sarah@example.com',
+              user_metadata: {
+                full_name: 'Sarah Connor',
+                avatar_url: 'https://lh3.googleusercontent.com/a/test-avatar-123',
+              },
+            } as unknown as User,
+            isAuthenticated: true,
+          })}
+        >
+          <DraftStoreProvider>
+            <LinkedInPreview />
+          </DraftStoreProvider>
+        </AuthContext.Provider>
+      )
+
+      expect(screen.getByText('Sarah Connor')).toBeInTheDocument()
+      const avatarImg = screen.getByAltText('Sarah Connor')
+      expect(avatarImg).toBeInTheDocument()
+      expect(avatarImg).toHaveAttribute('src', 'https://lh3.googleusercontent.com/a/test-avatar-123')
+      expect(avatarImg).toHaveAttribute('referrerpolicy', 'no-referrer')
+      expect(avatarImg).toHaveAttribute('crossorigin', 'anonymous')
+      expect(avatarImg).toHaveAttribute('loading', 'eager')
     })
   })
 })

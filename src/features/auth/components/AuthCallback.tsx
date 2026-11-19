@@ -52,6 +52,27 @@ export function AuthCallback() {
           resolvedUser.app_metadata?.role === 'admin' ||
           resolvedUser.app_metadata?.is_admin === true
 
+        // Pre-cache user profile metadata for instant 0ms avatar rendering
+        const avatar =
+          resolvedUser.user_metadata?.avatar_url ||
+          resolvedUser.user_metadata?.picture ||
+          resolvedUser.user_metadata?.avatar ||
+          ''
+        const name =
+          resolvedUser.user_metadata?.full_name ||
+          resolvedUser.user_metadata?.name ||
+          resolvedUser.email?.split('@')[0] ||
+          ''
+        if (typeof localStorage !== 'undefined') {
+          try {
+            if (avatar) localStorage.setItem('draftin_last_avatar_url', avatar)
+            if (name) localStorage.setItem('draftin_last_name', name)
+            localStorage.setItem('draftin_last_user_id', resolvedUser.id)
+          } catch {
+            // Ignore
+          }
+        }
+
         if (isUserAdmin) {
           if (safeReturnUrl && safeReturnUrl.startsWith('/admin')) {
             navigate(safeReturnUrl, { replace: true })

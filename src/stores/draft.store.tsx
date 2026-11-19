@@ -136,6 +136,12 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         // Storage unavailable or unparseable
       }
 
+      const googleAvatar =
+        user.user_metadata?.avatar_url ||
+        user.user_metadata?.picture ||
+        user.user_metadata?.avatar ||
+        ''
+
       return {
         id: user.id,
         name:
@@ -144,10 +150,32 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
           user.email?.split('@')[0] ||
           'Creator',
         headline: 'LinkedIn Creator & Writer',
-        avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+        avatarUrl: googleAvatar,
         username: user.email?.split('@')[0] || user.id.slice(0, 8),
       }
     }
+
+    // Hydrate synchronously from fast local cache while auth session resolves
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const lastAvatar = localStorage.getItem('draftin_last_avatar_url')
+        const lastName = localStorage.getItem('draftin_last_name')
+        const lastId = localStorage.getItem('draftin_last_user_id')
+        const lastHeadline = localStorage.getItem('draftin_last_headline')
+        if (lastAvatar || lastName) {
+          return {
+            id: lastId || '',
+            name: lastName || 'Creator',
+            headline: lastHeadline || 'LinkedIn Creator & Writer',
+            avatarUrl: lastAvatar || '',
+            username: lastName || '',
+          }
+        }
+      } catch {
+        // Storage unavailable
+      }
+    }
+
     if (isTestEnv) {
       return TEST_PROFILE
     }
@@ -160,6 +188,16 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = (updated: Partial<UserProfile>) => {
     setUserProfile((prev) => {
       const next = { ...prev, ...updated }
+      if (typeof localStorage !== 'undefined') {
+        try {
+          if (next.avatarUrl) localStorage.setItem('draftin_last_avatar_url', next.avatarUrl)
+          if (next.name) localStorage.setItem('draftin_last_name', next.name)
+          if (next.headline) localStorage.setItem('draftin_last_headline', next.headline)
+          if (next.id) localStorage.setItem('draftin_last_user_id', next.id)
+        } catch {
+          // Ignore
+        }
+      }
       if (user?.id) {
         try {
           localStorage.setItem(`draftin_profile_${user.id}`, JSON.stringify(next))
@@ -220,52 +258,63 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     let isCancelled = false
 
     if (currentUserId) {
+      const userProfileKey = `draftin_profile_${currentUserId}`
+      const googleName =
+        user?.user_metadata?.full_name ||
+        user?.user_metadata?.name ||
+        user?.email?.split('@')[0] ||
+        'Creator'
+      const googleAvatar =
+        user?.user_metadata?.avatar_url ||
+        user?.user_metadata?.picture ||
+        user?.user_metadata?.avatar ||
+        ''
+      const userHandle = user?.email?.split('@')[0] || currentUserId.slice(0, 8)
+
+      // Fast synchronous cache for instant 0ms avatar rendering
+      if (typeof localStorage !== 'undefined') {
+        try {
+          if (googleAvatar) localStorage.setItem('draftin_last_avatar_url', googleAvatar)
+          if (googleName) localStorage.setItem('draftin_last_name', googleName)
+          localStorage.setItem('draftin_last_user_id', currentUserId)
+        } catch {
+          // Ignore
+        }
+      }
+
+      let initialProf: UserProfile = {
+        id: currentUserId,
+        name: googleName,
+        headline: 'LinkedIn Creator & Writer',
+        avatarUrl: googleAvatar,
+        username: userHandle,
+      }
+
+      try {
+        const cachedProfStr = localStorage.getItem(userProfileKey)
+        if (cachedProfStr) {
+          const parsed = JSON.parse(cachedProfStr)
+          initialProf = {
+            ...initialProf,
+            ...parsed,
+            id: currentUserId,
+            avatarUrl: parsed.avatarUrl || googleAvatar,
+            name: parsed.name || googleName,
+          }
+        }
+      } catch {
+        // Ignore parse errors on cached profile
+      }
+
+      // Update store state asynchronously to avoid setState cascading render warnings
       Promise.resolve().then(() => {
         if (isCancelled) return
+        setUserProfile(initialProf)
         const cached = draftService.getLocalDrafts(currentUserId)
         setDrafts(cached)
         setActiveDraftId(cached.length > 0 ? cached[0].id : null)
 
-        // Sync profile from local storage / OAuth metadata
-        const userProfileKey = `draftin_profile_${currentUserId}`
-        const googleName =
-          user?.user_metadata?.full_name ||
-          user?.user_metadata?.name ||
-          user?.email?.split('@')[0] ||
-          'Creator'
-        const googleAvatar =
-          user?.user_metadata?.avatar_url ||
-          user?.user_metadata?.picture ||
-          ''
-        const userHandle = user?.email?.split('@')[0] || currentUserId.slice(0, 8)
-
-        let initialProf: UserProfile = {
-          id: currentUserId,
-          name: googleName,
-          headline: 'LinkedIn Creator & Writer',
-          avatarUrl: googleAvatar,
-          username: userHandle,
-        }
-
-        try {
-          const cachedProfStr = localStorage.getItem(userProfileKey)
-          if (cachedProfStr) {
-            const parsed = JSON.parse(cachedProfStr)
-            initialProf = {
-              ...initialProf,
-              ...parsed,
-              id: currentUserId,
-              avatarUrl: parsed.avatarUrl || googleAvatar,
-              name: parsed.name || googleName,
-            }
-          }
-        } catch {
-          // Ignore parse errors on cached profile
-        }
-
-        setUserProfile(initialProf)
-
-        // Query Supabase profiles
+        // Query Supabase profiles asynchronously in background
         if (isSupabaseConfigured) {
           supabase
             .from('profiles')
@@ -294,6 +343,8 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
                 }
                 try {
                   localStorage.setItem(userProfileKey, JSON.stringify(merged))
+                  if (merged.avatarUrl) localStorage.setItem('draftin_last_avatar_url', merged.avatarUrl)
+                  if (merged.name) localStorage.setItem('draftin_last_name', merged.name)
                 } catch {
                   // Ignore quota errors
                 }
@@ -328,6 +379,14 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         setSaveStatus('saved')
         setSyncError(null)
         if (!isTestEnv) {
+          try {
+            localStorage.removeItem('draftin_last_avatar_url')
+            localStorage.removeItem('draftin_last_name')
+            localStorage.removeItem('draftin_last_user_id')
+            localStorage.removeItem('draftin_last_headline')
+          } catch {
+            // Ignore
+          }
           setUserProfile(EMPTY_PROFILE)
         }
       })

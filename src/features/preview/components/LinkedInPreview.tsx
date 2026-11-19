@@ -37,17 +37,27 @@ export function LinkedInPreview() {
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
     user?.email?.split('@')[0] ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('draftin_last_name') || '' : '') ||
     'Creator'
 
   const authorAvatar =
     userProfile.avatarUrl ||
     user?.user_metadata?.avatar_url ||
     user?.user_metadata?.picture ||
+    user?.user_metadata?.avatar ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('draftin_last_avatar_url') || '' : '') ||
     ''
 
-  const authorHeadline = userProfile.headline || 'LinkedIn Creator & Writer'
+  const authorHeadline =
+    userProfile.headline ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('draftin_last_headline') || '' : '') ||
+    'LinkedIn Creator & Writer'
 
-  const authorId = user?.id || userProfile.id || ''
+  const authorId =
+    user?.id ||
+    userProfile.id ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem('draftin_last_user_id') || '' : '') ||
+    ''
 
   const authorInitials = useMemo(() => {
     if (!authorName) return 'CR'
@@ -102,7 +112,14 @@ export function LinkedInPreview() {
           <div className="flex items-start justify-between p-3.5 pb-2">
             <div className="flex items-start gap-2.5">
               <Avatar size="default" className="size-11 ring-1 ring-border shrink-0">
-                <AvatarImage src={authorAvatar} alt={authorName} />
+                <AvatarImage
+                  src={authorAvatar}
+                  alt={authorName}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  keepMounted
+                  loading="eager"
+                />
                 <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
                   {authorInitials}
                 </AvatarFallback>

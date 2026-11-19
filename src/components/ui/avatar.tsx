@@ -22,12 +22,21 @@ function Avatar({
   )
 }
 
-function AvatarImage({ className, ...props }: AvatarPrimitive.Image.Props) {
+function AvatarImage({
+  className,
+  referrerPolicy = "no-referrer",
+  crossOrigin = "anonymous",
+  keepMounted = true,
+  ...props
+}: AvatarPrimitive.Image.Props) {
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
+      referrerPolicy={referrerPolicy}
+      crossOrigin={crossOrigin}
+      keepMounted={keepMounted}
       className={cn(
-        "aspect-square size-full rounded-full object-cover",
+        "aspect-square size-full rounded-full object-cover data-[loading]:opacity-0 transition-opacity duration-150",
         className
       )}
       {...props}
