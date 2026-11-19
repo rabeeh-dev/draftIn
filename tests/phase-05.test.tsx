@@ -276,7 +276,7 @@ describe('Phase 5: Draft Management Engine', () => {
   })
 
   describe('DraftCard Content Rendering & Compact Column', () => {
-    it('strips raw HTML tags from content snippet and displays clean plain text', () => {
+    it('does not render content preview in draft card and renders compact header and stats', () => {
       const htmlDraft: Draft = {
         id: 'draft-html-preview',
         title: 'HTML Post Preview',
@@ -296,7 +296,10 @@ describe('Phase 5: Draft Management Engine', () => {
         />
       )
 
-      expect(screen.getByText('This is a clean snippet without any HTML tags.')).toBeInTheDocument()
+      expect(screen.getByText('HTML Post Preview')).toBeInTheDocument()
+      expect(screen.getByText('#Clean')).toBeInTheDocument()
+      // Content preview is removed from the draft sidebar card
+      expect(screen.queryByText(/clean snippet/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/<p>/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/<strong>/i)).not.toBeInTheDocument()
     })

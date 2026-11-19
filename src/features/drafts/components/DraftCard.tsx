@@ -143,11 +143,6 @@ export function DraftCard({ draft, isSelected, onSelect }: DraftCardProps) {
           </div>
         </div>
 
-        {/* Content Preview (Clean plain text, no raw HTML tags) */}
-        <p className="line-clamp-1 text-[11px] text-muted-foreground leading-snug">
-          {plainText || 'No content yet. Click to start drafting...'}
-        </p>
-
         {/* Tags */}
         {draft.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
