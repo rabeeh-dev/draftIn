@@ -31,6 +31,7 @@ export function LinkedInPreview() {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showProfileCustomizer, setShowProfileCustomizer] = useState(false)
   const [copiedPublishText, setCopiedPublishText] = useState(false)
+  const [showPasteNotice, setShowPasteNotice] = useState(false)
 
   const authorName =
     userProfile.name ||
@@ -84,14 +85,20 @@ export function LinkedInPreview() {
     const success = await copyTextToClipboard(publishingText)
     if (success) {
       setCopiedPublishText(true)
+      setShowPasteNotice(true)
       setTimeout(() => setCopiedPublishText(false), 2000)
     }
   }
 
   const handleOpenLinkedIn = () => {
-    if (typeof window !== 'undefined') {
-      window.open(LINKEDIN_COMPOSE_URL, '_blank', 'noopener,noreferrer')
+    if (typeof window === 'undefined') return
+    if (!isEmpty && publishingText) {
+      copyTextToClipboard(publishingText).catch(() => {})
+      setCopiedPublishText(true)
+      setShowPasteNotice(true)
+      setTimeout(() => setCopiedPublishText(false), 4000)
     }
+    window.open(LINKEDIN_COMPOSE_URL, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -359,6 +366,43 @@ export function LinkedInPreview() {
         }}
         onSave={(updated) => updateUserProfile(updated)}
       />
+
+      {/* Floating paste helper popup for LinkedIn web handoff */}
+      {showPasteNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-emerald-500/40 bg-card/95 p-4 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-200"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs">
+              <Check className="size-4" />
+            </div>
+            <div className="flex-1 space-y-1 text-left">
+              <p className="text-xs font-bold text-foreground">Post Copied to Clipboard!</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                LinkedIn's security policy requires users to paste posts manually. Your formatted post is copied — click the post box in LinkedIn and press{' '}
+                <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
+                  Ctrl+V
+                </kbd>{' '}
+                (or{' '}
+                <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground">
+                  ⌘V
+                </kbd>
+                ) to paste it!
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPasteNotice(false)}
+              className="text-muted-foreground hover:text-foreground text-xs p-1 rounded-md"
+              title="Close notice"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

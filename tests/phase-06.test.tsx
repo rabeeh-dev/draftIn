@@ -284,6 +284,7 @@ describe('Phase 6: Publishing Handoff Engine', () => {
         '_blank',
         'noopener,noreferrer'
       )
+      expect(clipboardWriteTextMock).toHaveBeenCalled()
     })
 
     it('opens PublishDialog when clicking Publish button in EditorHeader', async () => {

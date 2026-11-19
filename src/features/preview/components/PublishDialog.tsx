@@ -55,6 +55,10 @@ export function PublishDialog({ open, onOpenChange }: PublishDialogProps) {
 
   const handleOpenLinkedIn = () => {
     if (typeof window !== 'undefined') {
+      if (!isEmpty && publishingText) {
+        copyTextToClipboard(publishingText).catch(() => {})
+        setCopied(true)
+      }
       window.open(LINKEDIN_COMPOSE_URL, '_blank', 'noopener,noreferrer')
       setHasOpenedLinkedIn(true)
     }
@@ -154,7 +158,9 @@ export function PublishDialog({ open, onOpenChange }: PublishDialogProps) {
               <div className="flex flex-col text-left">
                 <span className="text-xs font-semibold text-foreground">Open LinkedIn Feed</span>
                 <span className="text-[11px] text-muted-foreground">
-                  Paste into the composer and hit Post!
+                  {hasOpenedLinkedIn
+                    ? 'Copied to clipboard! Press Ctrl+V (or ⌘V) in LinkedIn to paste.'
+                    : 'Copies post and opens LinkedIn. Press Ctrl+V to paste!'}
                 </span>
               </div>
             </div>
@@ -173,9 +179,9 @@ export function PublishDialog({ open, onOpenChange }: PublishDialogProps) {
         </div>
 
         {/* Tip / Footer Actions */}
-        <div className="flex items-center gap-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px]">
+        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px]">
           <Sparkles className="size-3.5 shrink-0 text-amber-500" />
-          <span>Tip: Press Ctrl+V (or Cmd+V) inside LinkedIn to paste your formatted post.</span>
+          <span>Why paste? LinkedIn security prevents external websites from directly typing into your feed. We copy your styled Unicode post to your clipboard so you can paste instantly with Ctrl+V (or ⌘V).</span>
         </div>
 
         <div className="flex sm:justify-between items-center gap-2 pt-2 border-t border-border/40">
