@@ -115,15 +115,13 @@ describe('Phase 2: Text Editor & Tiptap Integration', () => {
       })
     })
 
-    it('analyzes opening hook health for LinkedIn readability', async () => {
+    it('renders clean character and word metrics in status bar without distracting tips', async () => {
       renderWithProvider(<Editor />)
 
       await waitFor(() => {
-        // Status bar hook analyzer gives guidance (either optimal hook length or punchy hook tip)
-        const hookBanner = screen.getByText(
-          /Hook length looks optimal|Tip: Keep your opening hook punchy/i
-        )
-        expect(hookBanner).toBeInTheDocument()
+        expect(screen.getByText(/\/ 3000/)).toBeInTheDocument()
+        expect(screen.queryByText(/Tip: Keep your opening hook punchy/i)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Hook length looks optimal/i)).not.toBeInTheDocument()
       })
     })
   })

@@ -8,7 +8,7 @@ import { EditorHeader } from './EditorHeader'
 import { EditorToolbar } from './EditorToolbar'
 import { LinkedInPreview } from '@/features/preview/components/LinkedInPreview'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { FileEdit, Plus, Sparkles, AlertCircle } from 'lucide-react'
+import { FileEdit, Plus } from 'lucide-react'
 
 export function Editor() {
   const { activeDraft, updateDraft, createDraft, editorLayout } = useDraftStore()
@@ -62,11 +62,6 @@ export function Editor() {
   const progressPercent = Math.min(100, Math.round((chars / LINKEDIN_MAX_CHARS) * 100))
   const isOverLimit = chars > LINKEDIN_MAX_CHARS
 
-  const text = editor ? editor.getText() : ''
-  const firstLine = text.split('\n')[0] || ''
-  const hookLength = firstLine.trim().split(/\s+/).filter(Boolean).length
-  const isGoodHook = hookLength >= 4 && hookLength <= 15
-
   if (!activeDraft) {
     return (
       <div className="flex-1 h-full flex items-center justify-center bg-background p-6">
@@ -109,27 +104,8 @@ export function Editor() {
               </div>
             </div>
 
-            {/* Bottom Status Bar: Character Count, Word Count & Hook Analyzer */}
-            <div className="h-10 px-4 border-t border-border/70 bg-card/40 flex items-center justify-between text-xs text-muted-foreground shrink-0 gap-3">
-              {/* Hook Health & Advice */}
-              <div className="flex items-center gap-2 overflow-hidden truncate">
-                {chars > 0 ? (
-                  isGoodHook ? (
-                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium truncate">
-                      <Sparkles className="size-3 shrink-0" />
-                      <span>Hook length looks optimal ({firstLine.slice(0, 30)}...)</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-[11px] font-medium truncate">
-                      <AlertCircle className="size-3 shrink-0" />
-                      <span>Tip: Keep your opening hook punchy (under 15 words)</span>
-                    </div>
-                  )
-                ) : (
-                  <span className="text-[11px]">Ready to write</span>
-                )}
-              </div>
-
+            {/* Bottom Status Bar: Character Count & Word Count */}
+            <div className="h-10 px-4 border-t border-border/70 bg-card/40 flex items-center justify-end text-xs text-muted-foreground shrink-0 gap-3">
               {/* Character & Word Metrics */}
               <div className="flex items-center gap-3 shrink-0 font-medium text-[11px]">
                 <span>{words} words</span>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { DraftStoreProvider } from '@/stores/draft.store'
+import { DraftStoreProvider, useDraftStore } from '@/stores/draft.store'
 import { AppSidebar } from '@/components/layout/AppSidebar'
 import { DraftList } from '@/features/drafts/components/DraftList'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -48,10 +48,20 @@ describe('Phase 1: UI Building & Architecture', () => {
       ).toBeInTheDocument()
     })
 
-    it('filters drafts when a category tab is clicked', () => {
-      renderWithProvider(<DraftList />)
-      const scheduledTab = screen.getByRole('button', { name: 'Scheduled' })
-      fireEvent.click(scheduledTab)
+    it('filters drafts when category filter changes', () => {
+      function FilterTester() {
+        const { setFilter } = useDraftStore()
+        return (
+          <>
+            <button onClick={() => setFilter('scheduled')}>Show Scheduled</button>
+            <DraftList />
+          </>
+        )
+      }
+
+      renderWithProvider(<FilterTester />)
+      const scheduledBtn = screen.getByRole('button', { name: 'Show Scheduled' })
+      fireEvent.click(scheduledBtn)
 
       // Scheduled draft should remain visible
       expect(

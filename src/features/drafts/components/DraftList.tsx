@@ -6,7 +6,6 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { DraftListSkeleton } from '@/components/shared/LoadingState'
 import { Button } from '@/components/ui/button'
 import { Plus, FileText, SearchX } from 'lucide-react'
-import type { DraftFilter } from '@/types'
 
 export function DraftList() {
   const {
@@ -16,7 +15,6 @@ export function DraftList() {
     searchQuery,
     setSearchQuery,
     filter,
-    setFilter,
     sortBy,
     isLoading,
     createDraft,
@@ -65,13 +63,6 @@ export function DraftList() {
     return result
   }, [drafts, filter, searchQuery, sortBy])
 
-  const filterTabs: { label: string; value: DraftFilter }[] = [
-    { label: 'All', value: 'all' },
-    { label: 'Drafts', value: 'draft' },
-    { label: 'Scheduled', value: 'scheduled' },
-    { label: 'Published', value: 'published' },
-  ]
-
   return (
     <div className="flex h-full w-full flex-col bg-sidebar/30">
       {/* Panel Top Header */}
@@ -91,26 +82,6 @@ export function DraftList() {
         >
           <Plus className="size-3.5" />
         </Button>
-      </div>
-
-      {/* Filter Chips Bar */}
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-border/60 bg-muted/20 overflow-x-auto no-scrollbar">
-        {filterTabs.map((tab) => {
-          const isActive = filter === tab.value
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors shrink-0 ${
-                isActive
-                  ? 'bg-card text-foreground font-semibold shadow-2xs border border-border'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
       </div>
 
       {/* Search & Sort Panel */}
