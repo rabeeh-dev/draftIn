@@ -22,7 +22,6 @@ import {
   Feather,
   LogIn,
   LogOut,
-  ShieldCheck,
 } from 'lucide-react'
 import type { DraftFilter } from '@/types'
 
@@ -244,27 +243,6 @@ export function AppSidebar() {
                     Coming Soon
                   </Badge>
                 </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                navigate('/admin/login')
-              }}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-                !isSidebarOpen ? 'Admin' : ''
-              }`}
-              title={!isSidebarOpen ? 'Admin Panel' : undefined}
-            >
-              <ShieldCheck className="size-4 shrink-0 text-primary" />
-              {isSidebarOpen && (
-                <div className="flex-1 flex items-center justify-between overflow-hidden">
-                  <span className="truncate">Admin Panel</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 text-muted-foreground">
-                    Portal
-                  </Badge>
-                </div>
               )}
             </button>
           </div>

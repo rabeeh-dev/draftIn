@@ -101,9 +101,9 @@ describe('Phase 7: User Authentication & Admin Panel', () => {
       expect(screen.getByText('Sync cloud drafts')).toBeInTheDocument()
     })
 
-    it('renders Admin Panel entry in sidebar navigation', () => {
+    it('does NOT render Admin Panel entry in user sidebar navigation', () => {
       renderWithProviders(<AppSidebar />)
-      expect(screen.getByText('Admin Panel')).toBeInTheDocument()
+      expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument()
     })
   })
 
