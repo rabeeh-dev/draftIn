@@ -12,6 +12,8 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { LoadingState } from '@/components/shared/LoadingState'
 import { Button } from '@/components/ui/button'
 import { ShieldAlert, ArrowLeft, LogOut } from 'lucide-react'
+import { adminAuthService } from '@/features/admin/services/admin-auth.service'
+import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
 
 interface RouterContextType {
   path: string
@@ -178,29 +180,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
  * Protects admin application routes (/admin/*).
  */
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isAdmin, isSuspended, isLoading, user, signOut } = useAuth()
-  const { path, navigate } = useRouter()
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      if (path && path !== '/login' && !path.startsWith('/login')) {
-        sessionStorage.setItem('draftin_return_url', path)
-        navigate(`/login?returnUrl=${encodeURIComponent(path)}`, { replace: true })
-      }
-    }
-  }, [isLoading, isAuthenticated, path, navigate])
-
-  if (isLoading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
-        <LoadingState message="Verifying administrative credentials..." />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
+  const { isAdmin, isSuspended, user } = useAuth()
+  const { navigate } = useRouter()
+  const isAdminAuthenticated = adminAuthService.isAuthenticated() || isAdmin
 
   if (isSuspended) {
     return (
@@ -216,7 +198,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
             </p>
           </div>
           <div className="pt-2">
-            <Button onClick={() => signOut()} variant="outline" className="gap-2 text-xs w-full">
+            <Button onClick={() => navigate('/app', { replace: true })} variant="outline" className="gap-2 text-xs w-full">
               <LogOut className="size-3.5" />
               <span>Sign Out</span>
             </Button>
@@ -226,7 +208,13 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!isAdmin) {
+  // 1. If authenticated as admin via username/password or mock admin claim
+  if (isAdminAuthenticated) {
+    return <>{children}</>
+  }
+
+  // 2. If a non-admin regular Google user is in context without admin session
+  if (user && !isAdmin) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center p-6 bg-background text-foreground">
         <div className="w-full max-w-md p-6 rounded-2xl border border-destructive/20 bg-card shadow-sm space-y-4 text-center">
@@ -241,8 +229,11 @@ export function AdminGuard({ children }: { children: ReactNode }) {
               to access the system admin console.
             </p>
           </div>
-          <div className="pt-2">
-            <Button onClick={() => navigate('/app', { replace: true })} className="gap-2 text-xs w-full">
+          <div className="pt-2 flex flex-col gap-2">
+            <Button onClick={() => navigate('/admin/login')} className="gap-2 text-xs w-full">
+              <span>Sign In with Admin Credentials</span>
+            </Button>
+            <Button onClick={() => navigate('/app', { replace: true })} variant="outline" className="gap-2 text-xs w-full">
               <ArrowLeft className="size-3.5" />
               <span>Return to User Workspace</span>
             </Button>
@@ -252,5 +243,6 @@ export function AdminGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  return <>{children}</>
+  // 3. Otherwise render the dedicated Admin Login Page
+  return <AdminLoginPage />
 }

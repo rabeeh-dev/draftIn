@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { adminService } from '../services/admin.service'
+import { adminAuthService } from '../services/admin-auth.service'
 import type { AdminUser, UserRole, UserStatus, AdminAuditLog } from '../types/admin.types'
 import { useRouter } from '@/app/router'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -21,6 +22,7 @@ import {
   Search,
   ArrowLeft,
   Trash2,
+  LogOut,
   Ban,
   CheckCircle2,
   FileText,
@@ -158,6 +160,11 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
     }
   }
 
+  const handleAdminSignOut = () => {
+    adminAuthService.logout()
+    navigate('/admin/login', { replace: true })
+  }
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-background text-foreground">
       {/* Top Admin Header */}
@@ -214,15 +221,28 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
           </button>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleBackToWorkspace}
-          className="gap-2 text-xs"
-        >
-          <ArrowLeft className="size-3.5" />
-          <span>Back to Workspace</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleAdminSignOut}
+            className="gap-2 text-xs text-muted-foreground hover:text-destructive"
+            title="Log out of Administrator Session"
+          >
+            <LogOut className="size-3.5" />
+            <span>Admin Sign Out</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleBackToWorkspace}
+            className="gap-2 text-xs"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Back to Workspace</span>
+          </Button>
+        </div>
       </header>
 
       {/* Main Admin Content Container */}

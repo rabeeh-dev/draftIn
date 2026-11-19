@@ -28,7 +28,7 @@ import type { DraftFilter } from '@/types'
 
 export function AppSidebar() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
-  const { user, isAuthenticated, isAdmin, signOut } = useAuth()
+  const { user, isAuthenticated, signOut } = useAuth()
   const { navigate } = useRouter()
   const {
     drafts,
@@ -247,29 +247,26 @@ export function AppSidebar() {
               )}
             </button>
 
-            {(!isAuthenticated || isAdmin) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentView('admin')
-                  navigate('/admin')
-                }}
-                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-                  !isSidebarOpen ? 'Admin' : ''
-                }`}
-                title={!isSidebarOpen ? 'Admin Panel' : undefined}
-              >
-                <ShieldCheck className="size-4 shrink-0 text-primary" />
-                {isSidebarOpen && (
-                  <div className="flex-1 flex items-center justify-between overflow-hidden">
-                    <span className="truncate">Admin Panel</span>
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">
-                      Admin
-                    </Badge>
-                  </div>
-                )}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/admin/login')
+              }}
+              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
+                !isSidebarOpen ? 'Admin' : ''
+              }`}
+              title={!isSidebarOpen ? 'Admin Panel' : undefined}
+            >
+              <ShieldCheck className="size-4 shrink-0 text-primary" />
+              {isSidebarOpen && (
+                <div className="flex-1 flex items-center justify-between overflow-hidden">
+                  <span className="truncate">Admin Panel</span>
+                  <Badge variant="outline" className="text-[9px] px-1 py-0 text-muted-foreground">
+                    Portal
+                  </Badge>
+                </div>
+              )}
+            </button>
           </div>
         </div>
 

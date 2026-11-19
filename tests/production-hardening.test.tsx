@@ -9,6 +9,8 @@ import { mapRowToDraft, mapDraftToRow, draftService } from '@/features/drafts/se
 import { entitlementsService } from '@/features/billing/services/entitlements.service'
 import { checkSystemHealth } from '@/lib/health'
 import { logger } from '@/lib/logger'
+import { adminAuthService } from '@/features/admin/services/admin-auth.service'
+import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
 import type { Database } from '@/types/database.types'
 
 type DraftRow = Database['public']['Tables']['drafts']['Row']
@@ -229,6 +231,40 @@ describe('Phase 08-14: Production Hardening, Security & Reliability', () => {
       expect(entitlementsService.hasFeatureAccess('viralHooks', 'pro')).toBe(true)
       expect(entitlementsService.hasFeatureAccess('templates', 'pro')).toBe(true)
       expect(entitlementsService.hasFeatureAccess('analytics', 'pro')).toBe(true)
+    })
+  })
+
+  describe('Dedicated Admin Authentication (Username & Password)', () => {
+    it('rejects invalid administrator credentials', () => {
+      const result = adminAuthService.login('wrong-admin', 'wrong-pass')
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid administrator credentials')
+      expect(adminAuthService.isAuthenticated()).toBe(false)
+    })
+
+    it('authenticates successfully with valid admin username and password', () => {
+      const result = adminAuthService.login('admin', 'draftin@admin2026')
+      expect(result.success).toBe(true)
+      expect(adminAuthService.isAuthenticated()).toBe(true)
+      expect(adminAuthService.getAdminUsername()).toBe('admin')
+
+      // Terminate session
+      adminAuthService.logout()
+      expect(adminAuthService.isAuthenticated()).toBe(false)
+    })
+
+    it('renders dedicated AdminLoginPage with username and password inputs', () => {
+      render(
+        <RouterProvider>
+          <AdminLoginPage />
+        </RouterProvider>
+      )
+
+      expect(screen.getByRole('heading', { name: /admin console/i })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/e\.g\. admin/i)).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/enter administrator password/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /sign in as administrator/i })).toBeInTheDocument()
+      expect(screen.getByText(/return to writer workspace/i)).toBeInTheDocument()
     })
   })
 })

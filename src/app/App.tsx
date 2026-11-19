@@ -7,13 +7,14 @@ import { Editor } from '@/features/editor/components/Editor'
 import { LoginPage } from '@/features/auth/components/LoginPage'
 import { AuthCallback } from '@/features/auth/components/AuthCallback'
 import { AdminPanel } from '@/features/admin/components/AdminPanel'
+import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
 import { UserProfilePage } from '@/features/user/components/UserProfilePage'
 import { UserSettingsPage } from '@/features/user/components/UserSettingsPage'
 import { LoadingState } from '@/components/shared/LoadingState'
 
 function AppContent() {
   const { path, navigate } = useRouter()
-  const { isAuthenticated, isAdmin, isLoading } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
 
   // 1. Root route: redirect according to auth state
   useEffect(() => {
@@ -21,14 +22,12 @@ function AppContent() {
       if (!isLoading) {
         if (!isAuthenticated) {
           navigate('/login', { replace: true })
-        } else if (isAdmin) {
-          navigate('/admin', { replace: true })
         } else {
           navigate('/app', { replace: true })
         }
       }
     }
-  }, [path, isAuthenticated, isAdmin, isLoading, navigate])
+  }, [path, isAuthenticated, isLoading, navigate])
 
   // 2. OAuth Callback route
   if (path === '/auth/callback' || path.startsWith('/auth/callback')) {
@@ -45,17 +44,17 @@ function AppContent() {
       )
     }
     if (isAuthenticated) {
-      if (isAdmin) {
-        navigate('/admin', { replace: true })
-      } else {
-        navigate('/app', { replace: true })
-      }
+      navigate('/app', { replace: true })
       return null
     }
     return <LoginPage />
   }
 
-  // 4. Admin route hierarchy (/admin, /admin/users, /admin/activity, /admin/settings)
+  // 4. Admin route hierarchy (/admin, /admin/login, /admin/users, /admin/activity, /admin/settings)
+  if (path === '/admin/login') {
+    return <AdminLoginPage />
+  }
+
   if (path === '/admin' || path.startsWith('/admin/')) {
     return (
       <AdminGuard>
