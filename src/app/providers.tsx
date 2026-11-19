@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { AuthProvider } from '@/features/auth/context/AuthContext'
+import { RouterProvider } from './router'
 import { DraftStoreProvider } from '@/stores/draft.store'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -10,11 +11,13 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <AuthProvider>
-      <DraftStoreProvider>
-        <TooltipProvider>
-          {children}
-        </TooltipProvider>
-      </DraftStoreProvider>
+      <RouterProvider>
+        <DraftStoreProvider>
+          <TooltipProvider>
+            {children}
+          </TooltipProvider>
+        </DraftStoreProvider>
+      </RouterProvider>
     </AuthProvider>
   )
 }

@@ -1,6 +1,38 @@
-import type { AdminUser, AdminStats, UserRole, UserStatus } from '../types/admin.types'
+import type { AdminUser, AdminStats, UserRole, UserStatus, AdminAuditLog } from '../types/admin.types'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const ADMIN_USERS_STORAGE_KEY = 'draftin_admin_users_v1'
+const ADMIN_AUDIT_STORAGE_KEY = 'draftin_admin_audit_logs_v1'
+
+const INITIAL_AUDIT_LOGS: AdminAuditLog[] = [
+  {
+    id: 'log-1',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-3',
+    targetUserName: 'Marcus Vance',
+    action: 'status_change',
+    details: 'Account suspended for policy review',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+  },
+  {
+    id: 'log-2',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-5',
+    targetUserName: 'David Kim',
+    action: 'role_change',
+    details: 'Granted moderator permissions',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 14).toISOString(),
+  },
+  {
+    id: 'log-3',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-1',
+    targetUserName: 'Alex Morgan',
+    action: 'role_change',
+    details: 'Verified administrator account',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+  },
+]
 
 const INITIAL_ADMIN_USERS: AdminUser[] = [
   {
@@ -92,25 +124,107 @@ export const adminService = {
     }
   },
 
-  updateUserRole(userId: string, newRole: UserRole): AdminUser[] {
+  updateUserRole(userId: string, newRole: UserRole, adminEmail = 'admin@draftin.io'): AdminUser[] {
     const current = this.getUsers()
+    const targetUser = current.find((u) => u.id === userId)
     const updated = current.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     this.saveUsers(updated)
+
+    this.logAction({
+      adminEmail,
+      targetUserId: userId,
+      targetUserName: targetUser?.name || userId,
+      action: 'role_change',
+      details: `Updated role from ${targetUser?.role || 'unknown'} to ${newRole}`,
+    })
+
     return updated
   },
 
-  updateUserStatus(userId: string, newStatus: UserStatus): AdminUser[] {
+  updateUserStatus(userId: string, newStatus: UserStatus, adminEmail = 'admin@draftin.io'): AdminUser[] {
     const current = this.getUsers()
+    const targetUser = current.find((u) => u.id === userId)
     const updated = current.map((u) => (u.id === userId ? { ...u, status: newStatus } : u))
     this.saveUsers(updated)
+
+    this.logAction({
+      adminEmail,
+      targetUserId: userId,
+      targetUserName: targetUser?.name || userId,
+      action: 'status_change',
+      details: `Updated account status from ${targetUser?.status || 'unknown'} to ${newStatus}`,
+    })
+
     return updated
   },
 
-  deleteUser(userId: string): AdminUser[] {
+  deleteUser(userId: string, adminEmail = 'admin@draftin.io'): AdminUser[] {
     const current = this.getUsers()
+    const targetUser = current.find((u) => u.id === userId)
     const updated = current.filter((u) => u.id !== userId)
     this.saveUsers(updated)
+
+    this.logAction({
+      adminEmail,
+      targetUserId: userId,
+      targetUserName: targetUser?.name || userId,
+      action: 'user_delete',
+      details: `Permanently removed account ${targetUser?.email || userId}`,
+    })
+
     return updated
+  },
+
+  getAuditLogs(): AdminAuditLog[] {
+    try {
+      const stored = localStorage.getItem(ADMIN_AUDIT_STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {
+      // Storage unavailable or corrupted
+    }
+    return INITIAL_AUDIT_LOGS
+  },
+
+  saveAuditLogs(logs: AdminAuditLog[]): void {
+    try {
+      localStorage.setItem(ADMIN_AUDIT_STORAGE_KEY, JSON.stringify(logs))
+    } catch {
+      // Ignore storage errors
+    }
+  },
+
+  logAction(entry: Omit<AdminAuditLog, 'id' | 'createdAt'>): AdminAuditLog {
+    const newLog: AdminAuditLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+      ...entry,
+    }
+
+    const current = this.getAuditLogs()
+    const updated = [newLog, ...current].slice(0, 100)
+    this.saveAuditLogs(updated)
+
+    // Optional cloud audit log sync
+    if (isSupabaseConfigured) {
+      supabase
+        .from('admin_audit_logs')
+        .insert({
+          admin_email: newLog.adminEmail || null,
+          target_user_id: newLog.targetUserId || null,
+          target_user_name: newLog.targetUserName || null,
+          action: newLog.action,
+          details: newLog.details,
+        })
+        .then(
+          () => {},
+          () => {}
+        )
+    }
+
+    return newLog
   },
 
   computeStats(users: AdminUser[]): AdminStats {

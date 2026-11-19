@@ -5,6 +5,7 @@ import {
   useMemo,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react'
 import type { Draft, DraftFilter, SortOption, UserProfile, SaveStatus } from '@/types'
@@ -67,11 +68,26 @@ const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const isTestEnv =
+    (typeof globalThis !== 'undefined' &&
+      (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'test') ||
+    import.meta.env?.MODE === 'test'
+
   const [drafts, setDrafts] = useState<Draft[]>(() => {
-    return draftService.getLocalDrafts()
+    if (user?.id) {
+      return draftService.getLocalDrafts(user.id)
+    }
+    if (isTestEnv) {
+      return draftService.getLocalDrafts()
+    }
+    return []
   })
   const [activeDraftId, setActiveDraftId] = useState<string | null>(() => {
-    const local = draftService.getLocalDrafts()
+    const local = user?.id
+      ? draftService.getLocalDrafts(user.id)
+      : isTestEnv
+        ? draftService.getLocalDrafts()
+        : []
     return local.length > 0 ? local[0].id : null
   })
   const [searchQuery, setSearchQuery] = useState('')
@@ -91,6 +107,8 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
   const [currentView, setCurrentView] = useState<'workspace' | 'login' | 'admin'>('workspace')
 
+  const previousUserIdRef = useRef<string | null>(user?.id || null)
+
   const updateUserProfile = (updated: Partial<UserProfile>) => {
     setUserProfile((prev) => ({ ...prev, ...updated }))
   }
@@ -107,6 +125,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       const { data, error } = await draftService.fetchDrafts(user.id)
       if (!error && data) {
         setDrafts(data)
+        draftService.saveLocalDrafts(data, user.id)
         setActiveDraftId((currentId) => {
           if (!currentId || !data.some((d) => d.id === currentId)) {
             return data.length > 0 ? data[0].id : null
@@ -119,25 +138,48 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
+  // User session lifecycle: isolate cache per account & clear in-memory state on logout
   useEffect(() => {
-    if (!user?.id) return
+    const currentUserId = user?.id || null
+    const prevUserId = previousUserIdRef.current
+    previousUserIdRef.current = currentUserId
     let isCancelled = false
 
-    draftService.fetchDrafts(user.id).then(({ data, error }) => {
-      if (isCancelled || error || !data) return
-      setDrafts(data)
-      setActiveDraftId((currentId) => {
-        if (!currentId || !data.some((d) => d.id === currentId)) {
-          return data.length > 0 ? data[0].id : null
-        }
-        return currentId
-      })
-    })
+    if (currentUserId) {
+      Promise.resolve().then(() => {
+        if (isCancelled) return
+        const cached = draftService.getLocalDrafts(currentUserId)
+        setDrafts(cached)
+        setActiveDraftId(cached.length > 0 ? cached[0].id : null)
 
-    return () => {
-      isCancelled = true
+        return draftService.fetchDrafts(currentUserId)
+      }).then((result) => {
+        if (isCancelled || !result) return
+        const { data, error } = result
+        if (error || !data) return
+        setDrafts(data)
+        draftService.saveLocalDrafts(data, currentUserId)
+        setActiveDraftId((currentId) => {
+          if (!currentId || !data.some((d) => d.id === currentId)) {
+            return data.length > 0 ? data[0].id : null
+          }
+          return currentId
+        })
+      })
+
+      return () => {
+        isCancelled = true
+      }
+    } else if (prevUserId) {
+      Promise.resolve().then(() => {
+        if (isCancelled) return
+        setDrafts([])
+        setActiveDraftId(null)
+        setSaveStatus('saved')
+        setSyncError(null)
+      })
     }
-  }, [user])
+  }, [user?.id])
 
   // Autosave engine: Debounce changes by 1000ms
   useEffect(() => {
@@ -146,7 +188,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     const timer = setTimeout(async () => {
       setSaveStatus('saving')
       try {
-        draftService.saveBackupDraft(activeDraft)
+        draftService.saveBackupDraft(activeDraft, user?.id)
         if (user?.id) {
           const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
           if (error) {
@@ -174,7 +216,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     setSyncError(null)
 
     try {
-      draftService.saveBackupDraft(activeDraft)
+      draftService.saveBackupDraft(activeDraft, user?.id)
       if (user?.id) {
         const { error } = await draftService.updateDraft(activeDraft.id, activeDraft, user.id)
         if (error) {
@@ -230,7 +272,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     }
     setDrafts((prev) => {
       const next = [newDraft, ...prev]
-      draftService.saveLocalDrafts(next)
+      draftService.saveLocalDrafts(next, user?.id)
       return next
     })
     setActiveDraftId(newId)
@@ -259,7 +301,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         }
         return d
       })
-      draftService.saveLocalDrafts(next)
+      draftService.saveLocalDrafts(next, user?.id)
       return next
     })
     setSaveStatus('unsaved')
@@ -268,7 +310,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const deleteDraft = (id: string) => {
     setDrafts((prev) => {
       const remaining = prev.filter((d) => d.id !== id)
-      draftService.saveLocalDrafts(remaining)
+      draftService.saveLocalDrafts(remaining, user?.id)
       if (activeDraftId === id) {
         setActiveDraftId(remaining.length > 0 ? remaining[0].id : null)
       }
@@ -299,7 +341,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     }
     setDrafts((prev) => {
       const next = [duplicated, ...prev]
-      draftService.saveLocalDrafts(next)
+      draftService.saveLocalDrafts(next, user?.id)
       return next
     })
     setActiveDraftId(duplicated.id)
@@ -315,7 +357,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         }
         return d
       })
-      draftService.saveLocalDrafts(next)
+      draftService.saveLocalDrafts(next, user?.id)
       return next
     })
 

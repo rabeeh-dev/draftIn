@@ -16,6 +16,9 @@ export interface Database {
           headline: string | null
           avatar_url: string | null
           username: string | null
+          email: string | null
+          role: string
+          status: string
           created_at: string
           updated_at: string
         }
@@ -25,6 +28,9 @@ export interface Database {
           headline?: string | null
           avatar_url?: string | null
           username?: string | null
+          email?: string | null
+          role?: string
+          status?: string
           created_at?: string
           updated_at?: string
         }
@@ -34,8 +40,44 @@ export interface Database {
           headline?: string | null
           avatar_url?: string | null
           username?: string | null
+          email?: string | null
+          role?: string
+          status?: string
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      admin_audit_logs: {
+        Row: {
+          id: string
+          admin_id: string | null
+          admin_email: string | null
+          target_user_id: string | null
+          target_user_name: string | null
+          action: string
+          details: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          admin_id?: string | null
+          admin_email?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+          action: string
+          details?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          admin_id?: string | null
+          admin_email?: string | null
+          target_user_id?: string | null
+          target_user_name?: string | null
+          action?: string
+          details?: string | null
+          created_at?: string
         }
         Relationships: []
       }

@@ -7,6 +7,8 @@ export interface AuthContextType {
   session: Session | null
   isLoading: boolean
   isAuthenticated: boolean
+  isAdmin: boolean
+  role: 'admin' | 'user'
   error: AuthError | null
   signInWithEmail: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signUpWithEmail: (
@@ -14,7 +16,10 @@ export interface AuthContextType {
     password: string,
     fullName?: string
   ) => Promise<{ error: AuthError | null }>
-  signInWithOAuth: (provider: 'linkedin_oidc' | 'google' | 'github') => Promise<{ error: AuthError | null }>
-  signInWithGoogle: () => Promise<{ error: AuthError | null }>
+  signInWithOAuth: (
+    provider: 'linkedin_oidc' | 'google' | 'github',
+    customRedirectTo?: string
+  ) => Promise<{ error: AuthError | null }>
+  signInWithGoogle: (returnUrl?: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<void>
 }

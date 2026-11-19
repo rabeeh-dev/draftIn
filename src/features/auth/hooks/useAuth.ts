@@ -7,6 +7,8 @@ const fallbackAuthContext: AuthContextType = {
   session: null,
   isLoading: false,
   isAuthenticated: false,
+  isAdmin: false,
+  role: 'user',
   error: null,
   signInWithEmail: async () => ({ error: null }),
   signUpWithEmail: async () => ({ error: null }),

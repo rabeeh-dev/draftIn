@@ -39,23 +39,37 @@ export const authService = {
     return { session: data.session, error }
   },
 
-  async signInWithOAuth(provider: 'linkedin_oidc' | 'google' | 'github'): Promise<{ error: AuthError | null }> {
+  async signInWithOAuth(
+    provider: 'linkedin_oidc' | 'google' | 'github',
+    customRedirectTo?: string
+  ): Promise<{ error: AuthError | null }> {
     if (!isSupabaseConfigured) {
       return {
         error: { name: 'ConfigError', message: 'Supabase credentials are not configured in .env.local' } as AuthError,
       }
     }
+    const redirectTo = customRedirectTo || `${window.location.origin}/auth/callback`
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo,
       },
     })
     return { error }
   },
 
-  async signInWithGoogle(): Promise<{ error: AuthError | null }> {
-    return this.signInWithOAuth('google')
+  async signInWithGoogle(returnUrl?: string): Promise<{ error: AuthError | null }> {
+    let callback = `${window.location.origin}/auth/callback`
+    if (returnUrl) {
+      try {
+        const u = new URL(callback)
+        u.searchParams.set('returnUrl', returnUrl)
+        callback = u.toString()
+      } catch {
+        // fallback
+      }
+    }
+    return this.signInWithOAuth('google', callback)
   },
 
   async signOut(): Promise<{ error: AuthError | null }> {

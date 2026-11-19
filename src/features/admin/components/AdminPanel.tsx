@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { adminService } from '../services/admin.service'
-import type { AdminUser, UserRole, UserStatus } from '../types/admin.types'
+import type { AdminUser, UserRole, UserStatus, AdminAuditLog } from '../types/admin.types'
+import { useRouter } from '@/app/router'
+import { isSupabaseConfigured } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -24,14 +26,28 @@ import {
   UserCheck,
   UserX,
   SlidersHorizontal,
+  History,
+  Key,
+  Database,
 } from 'lucide-react'
 
 interface AdminPanelProps {
   onBack?: () => void
+  path?: string
 }
 
-export function AdminPanel({ onBack }: AdminPanelProps) {
+export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
+  const { path: routerPath, navigate } = useRouter()
+  const currentPath = propPath || routerPath || '/admin'
+
+  const activeTab: 'users' | 'activity' | 'settings' = useMemo(() => {
+    if (currentPath.startsWith('/admin/activity')) return 'activity'
+    if (currentPath.startsWith('/admin/settings')) return 'settings'
+    return 'users'
+  }, [currentPath])
+
   const [users, setUsers] = useState<AdminUser[]>(() => adminService.getUsers())
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(() => adminService.getAuditLogs())
   const [searchQuery, setSearchQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | UserStatus>('all')
@@ -39,6 +55,18 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   // Modals state
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null)
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+
+  // Resolve deep-linked user if URL contains /admin/users/:id
+  const inspectedUser = useMemo(() => {
+    if (selectedUser) return selectedUser
+    if (currentPath.startsWith('/admin/users/')) {
+      const targetId = currentPath.split('/admin/users/')[1]
+      if (targetId) {
+        return users.find((u) => u.id === targetId) || null
+      }
+    }
+    return null
+  }, [selectedUser, currentPath, users])
 
   const stats = useMemo(() => adminService.computeStats(users), [users])
 
@@ -70,6 +98,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     const nextStatus: UserStatus = user.status === 'active' ? 'suspended' : 'active'
     const updated = adminService.updateUserStatus(user.id, nextStatus)
     setUsers(updated)
+    setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === user.id) {
       setSelectedUser({ ...selectedUser, status: nextStatus })
     }
@@ -79,6 +108,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     const nextRole: UserRole = user.role === 'admin' ? 'user' : 'admin'
     const updated = adminService.updateUserRole(user.id, nextRole)
     setUsers(updated)
+    setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === user.id) {
       setSelectedUser({ ...selectedUser, role: nextRole })
     }
@@ -88,16 +118,31 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     if (!userToDelete) return
     const updated = adminService.deleteUser(userToDelete.id)
     setUsers(updated)
+    setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === userToDelete.id) {
       setSelectedUser(null)
     }
     setUserToDelete(null)
   }
 
+  const handleTabChange = (tab: 'users' | 'activity' | 'settings') => {
+    if (tab === 'users') navigate('/admin/users')
+    else if (tab === 'activity') navigate('/admin/activity')
+    else if (tab === 'settings') navigate('/admin/settings')
+  }
+
+  const handleBackToWorkspace = () => {
+    if (onBack) {
+      onBack()
+    } else {
+      navigate('/app')
+    }
+  }
+
   return (
     <div className="min-h-screen w-full flex flex-col bg-background text-foreground">
       {/* Top Admin Header */}
-      <header className="h-16 w-full border-b border-border/80 px-4 md:px-8 flex items-center justify-between bg-card/60 backdrop-blur-md sticky top-0 z-20">
+      <header className="h-16 w-full border-b border-border/80 px-4 md:px-8 flex items-center justify-between bg-card/60 backdrop-blur-md sticky top-0 z-20 gap-4">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
             <ShieldCheck className="size-5" />
@@ -110,22 +155,193 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
           </div>
         </div>
 
-        {onBack && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onBack}
-            className="gap-2 text-xs"
+        {/* Navigation Tabs */}
+        <div className="hidden sm:flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border/80 text-xs">
+          <button
+            type="button"
+            onClick={() => handleTabChange('users')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            <ArrowLeft className="size-3.5" />
-            <span>Back to Workspace</span>
-          </Button>
-        )}
+            <Users className="size-3.5" />
+            <span>Users</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('activity')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'activity'
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <History className="size-3.5" />
+            <span>Activity Log</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange('settings')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-card text-foreground shadow-2xs'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <SlidersHorizontal className="size-3.5" />
+            <span>System Settings</span>
+          </button>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleBackToWorkspace}
+          className="gap-2 text-xs"
+        >
+          <ArrowLeft className="size-3.5" />
+          <span>Back to Workspace</span>
+        </Button>
       </header>
 
       {/* Main Admin Content Container */}
       <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto space-y-6">
-        {/* Metric Summary Cards */}
+        {activeTab === 'activity' ? (
+          /* Admin Activity / Audit Log View */
+          <div className="space-y-6">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold tracking-tight">Administrative Activity & Audit Log</h2>
+              <p className="text-xs text-muted-foreground">
+                Immutable event stream of administrative moderation actions, role modifications, and status changes.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30 text-muted-foreground font-semibold text-[11px]">
+                      <th className="py-3 px-4">Timestamp</th>
+                      <th className="py-3 px-4">Admin</th>
+                      <th className="py-3 px-4">Action</th>
+                      <th className="py-3 px-4">Target User</th>
+                      <th className="py-3 px-4">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {auditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
+                          {new Date(log.createdAt).toLocaleString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap font-medium text-foreground">
+                          {log.adminEmail || 'admin@draftin.io'}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <Badge
+                            variant={
+                              log.action === 'user_delete'
+                                ? 'destructive'
+                                : log.action === 'role_change'
+                                  ? 'outline'
+                                  : 'secondary'
+                            }
+                            className="text-[10px] capitalize"
+                          >
+                            {log.action.replace('_', ' ')}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap font-semibold">
+                          {log.targetUserName || log.targetUserId || 'System'}
+                        </td>
+                        <td className="py-3 px-4 text-muted-foreground leading-relaxed">
+                          {log.details}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : activeTab === 'settings' ? (
+          /* Admin System Settings View */
+          <div className="space-y-6">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold tracking-tight">System & Security Configuration</h2>
+              <p className="text-xs text-muted-foreground">
+                Manage backend database policies, OAuth authentication providers, and application security parameters.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Supabase Connection */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Database className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Supabase Database & RLS</h3>
+                    <p className="text-[11px] text-muted-foreground">Row Level Security policy enforcement</p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-xs pt-1">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Connection Status</span>
+                    <Badge variant={isSupabaseConfigured ? 'outline' : 'secondary'} className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                      {isSupabaseConfigured ? 'Connected' : 'Local Fallback'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Drafts RLS Policy</span>
+                    <span className="font-mono text-[11px] text-foreground">auth.uid() = user_id</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Admin RLS Policy</span>
+                    <span className="font-mono text-[11px] text-foreground">profiles.role = 'admin'</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* OAuth Provider */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-2xs space-y-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Key className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Google OAuth Single Sign-On</h3>
+                    <p className="text-[11px] text-muted-foreground">Authentication provider configuration</p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-xs pt-1">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Provider</span>
+                    <span className="font-semibold text-foreground">Google (Supabase Auth)</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Callback URL</span>
+                    <span className="font-mono text-[11px] text-foreground">/auth/callback</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/30 border border-border/80">
+                    <span className="text-muted-foreground">Session Lifecycle</span>
+                    <span className="font-semibold text-foreground">Reactive onAuthStateChange</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Metric Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-4">
           {/* Total Users */}
           <div className="rounded-2xl border border-border bg-card p-4 shadow-2xs space-y-2">
@@ -391,7 +607,9 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
             </table>
           </div>
         </div>
-      </main>
+      </>
+    )}
+  </main>
 
       {/* Delete User Confirmation Dialog */}
       <ConfirmDialog
@@ -407,22 +625,29 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
       />
 
       {/* Detailed User Inspection Dialog */}
-      {selectedUser && (
-        <Dialog open={Boolean(selectedUser)} onOpenChange={(open) => !open && setSelectedUser(null)}>
+      {inspectedUser && (
+        <Dialog open={Boolean(inspectedUser)} onOpenChange={(open) => {
+          if (!open) {
+            setSelectedUser(null)
+            if (currentPath.startsWith('/admin/users/')) {
+              navigate('/admin/users')
+            }
+          }
+        }}>
           <DialogPopup className="max-w-lg">
             <div className="flex items-center gap-3 pb-2 border-b border-border">
               <Avatar size="lg" className="size-12 ring-2 ring-primary/20">
-                <AvatarImage src={selectedUser.avatarUrl} alt={selectedUser.name} />
+                <AvatarImage src={inspectedUser.avatarUrl} alt={inspectedUser.name} />
                 <AvatarFallback className="font-bold text-sm bg-primary/10 text-primary">
-                  {selectedUser.name.slice(0, 2).toUpperCase()}
+                  {inspectedUser.name.slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
-                <DialogTitle className="text-base font-bold truncate">{selectedUser.name}</DialogTitle>
-                <DialogDescription className="text-xs truncate">{selectedUser.email}</DialogDescription>
+                <DialogTitle className="text-base font-bold truncate">{inspectedUser.name}</DialogTitle>
+                <DialogDescription className="text-xs truncate">{inspectedUser.email}</DialogDescription>
               </div>
-              <Badge variant={selectedUser.status === 'active' ? 'outline' : 'destructive'} className="text-[10px]">
-                {selectedUser.status}
+              <Badge variant={inspectedUser.status === 'active' ? 'outline' : 'destructive'} className="text-[10px]">
+                {inspectedUser.status}
               </Badge>
             </div>
 
@@ -430,29 +655,29 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
               <div className="space-y-1">
                 <span className="font-semibold text-muted-foreground text-[11px]">Headline & Bio</span>
                 <p className="p-2.5 rounded-lg border border-border bg-muted/30 text-foreground leading-relaxed">
-                  {selectedUser.headline}
+                  {inspectedUser.headline}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl border border-border bg-card">
                 <div>
                   <span className="text-[10px] text-muted-foreground font-medium">Account Role</span>
-                  <p className="font-bold capitalize text-foreground mt-0.5">{selectedUser.role}</p>
+                  <p className="font-bold capitalize text-foreground mt-0.5">{inspectedUser.role}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground font-medium">Total Drafts</span>
-                  <p className="font-bold text-foreground mt-0.5">{selectedUser.draftsCount} posts</p>
+                  <p className="font-bold text-foreground mt-0.5">{inspectedUser.draftsCount} posts</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground font-medium">Joined Date</span>
                   <p className="font-bold text-foreground mt-0.5">
-                    {new Date(selectedUser.createdAt).toLocaleDateString()}
+                    {new Date(inspectedUser.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground font-medium">Last Active</span>
                   <p className="font-bold text-foreground mt-0.5">
-                    {new Date(selectedUser.lastActiveAt).toLocaleDateString()}
+                    {new Date(inspectedUser.lastActiveAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -461,19 +686,19 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleToggleRole(selectedUser)}
+                  onClick={() => handleToggleRole(inspectedUser)}
                   className="text-xs"
                 >
-                  {selectedUser.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
+                  {inspectedUser.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
                 </Button>
 
                 <Button
-                  variant={selectedUser.status === 'active' ? 'destructive' : 'default'}
+                  variant={inspectedUser.status === 'active' ? 'destructive' : 'default'}
                   size="sm"
-                  onClick={() => handleToggleStatus(selectedUser)}
+                  onClick={() => handleToggleStatus(inspectedUser)}
                   className="text-xs"
                 >
-                  {selectedUser.status === 'active' ? 'Suspend Account' : 'Reactivate Account'}
+                  {inspectedUser.status === 'active' ? 'Suspend Account' : 'Reactivate Account'}
                 </Button>
               </div>
             </div>

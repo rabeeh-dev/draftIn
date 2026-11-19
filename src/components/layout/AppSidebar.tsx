@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useRouter } from '@/app/router'
 import { AuthModal } from '@/features/auth/components/AuthModal'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +29,8 @@ import type { DraftFilter } from '@/types'
 
 export function AppSidebar() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
-  const { user, isAuthenticated, signOut } = useAuth()
+  const { user, isAuthenticated, isAdmin, signOut } = useAuth()
+  const { navigate } = useRouter()
   const {
     drafts,
     filter,
@@ -119,7 +121,10 @@ export function AppSidebar() {
         {/* Action: New Draft Button */}
         <div className="p-3">
           <Button
-            onClick={() => createDraft()}
+            onClick={() => {
+              createDraft()
+              navigate('/app/editor')
+            }}
             className={`w-full gap-2 shadow-xs transition-all ${
               !isSidebarOpen ? 'justify-center px-0' : 'justify-start'
             }`}
@@ -147,6 +152,7 @@ export function AppSidebar() {
                   key={item.filter}
                   onClick={() => {
                     setFilter(item.filter)
+                    navigate('/app/editor')
                     // Auto-close drawer on mobile
                     if (window.innerWidth < 768) setIsSidebarOpen(false)
                   }}
@@ -228,23 +234,28 @@ export function AppSidebar() {
               {isSidebarOpen && <span className="flex-1 text-left truncate">Analytics</span>}
             </button>
 
-            <button
-              onClick={() => setCurrentView('admin')}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-                !isSidebarOpen ? 'Admin' : ''
-              }`}
-              title={!isSidebarOpen ? 'Admin Panel' : undefined}
-            >
-              <ShieldCheck className="size-4 shrink-0 text-primary" />
-              {isSidebarOpen && (
-                <div className="flex-1 flex items-center justify-between overflow-hidden">
-                  <span className="truncate">Admin Panel</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">
-                    Admin
-                  </Badge>
-                </div>
-              )}
-            </button>
+            {(!isAuthenticated || isAdmin) && (
+              <button
+                onClick={() => {
+                  setCurrentView('admin')
+                  navigate('/admin')
+                }}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
+                  !isSidebarOpen ? 'Admin' : ''
+                }`}
+                title={!isSidebarOpen ? 'Admin Panel' : undefined}
+              >
+                <ShieldCheck className="size-4 shrink-0 text-primary" />
+                {isSidebarOpen && (
+                  <div className="flex-1 flex items-center justify-between overflow-hidden">
+                    <span className="truncate">Admin Panel</span>
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/30 text-primary">
+                      Admin
+                    </Badge>
+                  </div>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -253,7 +264,7 @@ export function AppSidebar() {
         {/* Bottom User Profile Section */}
         <div className="p-2 space-y-1">
           <button
-            onClick={() => {}}
+            onClick={() => navigate('/app/settings')}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
               !isSidebarOpen ? 'justify-center px-0' : ''
             }`}
@@ -291,7 +302,10 @@ export function AppSidebar() {
                   </AvatarFallback>
                 </Avatar>
                 {isSidebarOpen && (
-                  <div className="flex-1 overflow-hidden text-left cursor-pointer" onClick={() => setCurrentView('login')}>
+                  <div
+                    className="flex-1 overflow-hidden text-left cursor-pointer"
+                    onClick={() => navigate('/app/profile')}
+                  >
                     <p className="truncate text-xs font-semibold text-foreground leading-none hover:underline">
                       {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
                     </p>
