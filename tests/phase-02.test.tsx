@@ -28,37 +28,52 @@ describe('Phase 2: Text Editor & Tiptap Integration', () => {
       expect(editorElement).toHaveAttribute('contenteditable', 'true')
     })
 
-    it('renders all required formatting toolbar buttons (bold, italic, strike, lists, links)', async () => {
+    it('renders all required formatting toolbar buttons (undo, redo, bold, italic, strike, lists, tags)', async () => {
       renderWithProvider(<Editor />)
 
       await waitFor(() => {
+        expect(screen.getByTitle('Undo (Ctrl+Z)')).toBeInTheDocument()
+        expect(screen.getByTitle('Redo (Ctrl+Y)')).toBeInTheDocument()
         expect(screen.getByTitle('Bold (Ctrl+B)')).toBeInTheDocument()
         expect(screen.getByTitle('Italic (Ctrl+I)')).toBeInTheDocument()
         expect(screen.getByTitle('Strikethrough (Ctrl+Shift+X)')).toBeInTheDocument()
         expect(screen.getByTitle('Bullet List')).toBeInTheDocument()
         expect(screen.getByTitle('Numbered List')).toBeInTheDocument()
-        expect(screen.getByTitle('Blockquote')).toBeInTheDocument()
-        expect(screen.getByTitle('Inline Code')).toBeInTheDocument()
-        expect(screen.getByTitle('Insert Link (Ctrl+K)')).toBeInTheDocument()
+        expect(screen.getByTitle('Insert Hashtags')).toBeInTheDocument()
       })
     })
 
-    it('toggles formatting marks (Bold, Italic, Strike) via toolbar buttons', async () => {
+    it('toggles formatting marks (Bold, Italic, Strike) and executes list and tag commands via toolbar buttons', async () => {
       renderWithProvider(<Editor />)
 
       const boldBtn = await screen.findByTitle('Bold (Ctrl+B)')
       const italicBtn = screen.getByTitle('Italic (Ctrl+I)')
       const strikeBtn = screen.getByTitle('Strikethrough (Ctrl+Shift+X)')
+      const bulletBtn = screen.getByTitle('Bullet List')
+      const numberedBtn = screen.getByTitle('Numbered List')
+      const undoBtn = screen.getByTitle('Undo (Ctrl+Z)')
+      const redoBtn = screen.getByTitle('Redo (Ctrl+Y)')
+      const tagsBtn = screen.getByTitle('Insert Hashtags')
 
       // Click formatting buttons
       fireEvent.click(boldBtn)
       fireEvent.click(italicBtn)
       fireEvent.click(strikeBtn)
+      fireEvent.click(bulletBtn)
+      fireEvent.click(numberedBtn)
+      fireEvent.click(undoBtn)
+      fireEvent.click(redoBtn)
+      fireEvent.click(tagsBtn)
 
       // Elements remain interactive without throwing errors
       expect(boldBtn).toBeInTheDocument()
       expect(italicBtn).toBeInTheDocument()
       expect(strikeBtn).toBeInTheDocument()
+      expect(bulletBtn).toBeInTheDocument()
+      expect(numberedBtn).toBeInTheDocument()
+      expect(undoBtn).toBeInTheDocument()
+      expect(redoBtn).toBeInTheDocument()
+      expect(tagsBtn).toBeInTheDocument()
     })
   })
 

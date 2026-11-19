@@ -20,13 +20,6 @@ export function Editor() {
       StarterKit.configure({
         bulletList: { keepMarks: true, keepAttributes: false },
         orderedList: { keepMarks: true, keepAttributes: false },
-        link: {
-          openOnClick: false,
-          autolink: true,
-          HTMLAttributes: {
-            class: 'text-[#0A66C2] dark:text-[#70b5f9] underline cursor-pointer font-medium',
-          },
-        },
       }),
       Placeholder.configure({
         placeholder: 'What do you want to talk about? Start with a punchy hook...',
