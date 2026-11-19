@@ -85,6 +85,31 @@ export function mapDraftToRow(draft: Draft, userId: string): DraftInsert {
   }
 }
 
+// Detects whether the live database schema supports extended columns (version, last_saved_at, content_json, deleted_at)
+let hasExtendedDraftsColumns: boolean | null = null
+
+function isMissingColumnError(error?: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (typeof error.message === 'string' &&
+      (error.message.includes('column') ||
+        error.message.includes('schema cache') ||
+        error.message.includes('does not exist')))
+  )
+}
+
+function isMissingTableError(error?: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  return (
+    error.code === '42P01' ||
+    error.code === 'PGRST205' ||
+    (typeof error.message === 'string' &&
+      (error.message.includes('does not exist') || error.message.includes('not found')))
+  )
+}
+
 export const draftService = {
   // User-isolated local storage management
   getLocalDrafts(userId?: string | null): Draft[] {
@@ -168,21 +193,48 @@ export const draftService = {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('drafts')
-        .insert({
-          id: draft.id,
-          user_id: userId,
-          title: draft.title,
-          content: draft.content,
+      const baseRow: Record<string, unknown> = {
+        id: draft.id,
+        user_id: userId,
+        title: draft.title,
+        content: draft.content,
+        status: draft.status,
+        is_starred: draft.isStarred,
+        tags: draft.tags,
+        scheduled_for: sanitizeScheduledTimestamp(draft.scheduledFor),
+        updated_at: draft.updatedAt,
+      }
+
+      if (hasExtendedDraftsColumns !== false) {
+        const extendedRow: Record<string, unknown> = {
+          ...baseRow,
           content_json: (draft.contentJson as Json) ?? null,
           version: draft.version ?? 1,
-          status: draft.status,
-          is_starred: draft.isStarred,
-          tags: draft.tags,
-          scheduled_for: sanitizeScheduledTimestamp(draft.scheduledFor),
           last_saved_at: new Date().toISOString(),
-        })
+        }
+
+        const { data, error } = await supabase
+          .from('drafts')
+          .insert(extendedRow as DraftInsert)
+          .select()
+          .single()
+
+        if (!error && data) {
+          hasExtendedDraftsColumns = true
+          return { data: mapRowToDraft(data), error: null }
+        }
+
+        if (isMissingColumnError(error)) {
+          hasExtendedDraftsColumns = false
+          // Fall through to insert with baseRow
+        } else if (error) {
+          return { data: draft, error: new Error(error.message) }
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('drafts')
+        .insert(baseRow as DraftInsert)
         .select()
         .single()
 
@@ -207,11 +259,34 @@ export const draftService = {
     }
 
     try {
+      if (hasExtendedDraftsColumns !== false) {
+        const { data, error } = await supabase
+          .from('drafts')
+          .select('*')
+          .eq('user_id', userId)
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+
+        if (!error && data) {
+          hasExtendedDraftsColumns = true
+          const drafts = data.map(mapRowToDraft)
+          this.saveLocalDrafts(drafts, userId)
+          return { data: drafts, error: null }
+        }
+
+        if (isMissingColumnError(error)) {
+          hasExtendedDraftsColumns = false
+          // Fall through to query without deleted_at
+        } else if (error) {
+          const local = this.getLocalDrafts(userId)
+          return { data: local, error: new Error(error.message) }
+        }
+      }
+
       const { data, error } = await supabase
         .from('drafts')
         .select('*')
         .eq('user_id', userId)
-        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -231,7 +306,7 @@ export const draftService = {
     }
   },
 
-  // 3. Edit / Update Draft with Optimistic Concurrency & Versioning
+  // 3. Edit / Update Draft with Optimistic Concurrency & Auto-Fallback
   async updateDraft(
     id: string,
     updates: Partial<Draft>,
@@ -260,31 +335,56 @@ export const draftService = {
     }
 
     try {
-      const updatePayload: DraftUpdate = {
+      const basePayload: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
-        version: nextVersion,
-        last_saved_at: nextLastSavedAt,
       }
-      if (updates.title !== undefined) updatePayload.title = updates.title
-      if (updates.content !== undefined) updatePayload.content = updates.content
-      if (updates.contentJson !== undefined) {
-        updatePayload.content_json = (updates.contentJson as Json) ?? null
-      }
-      if (updates.status !== undefined) updatePayload.status = updates.status
-      if (updates.isStarred !== undefined) updatePayload.is_starred = updates.isStarred
-      if (updates.tags !== undefined) updatePayload.tags = updates.tags
+      if (updates.title !== undefined) basePayload.title = updates.title
+      if (updates.content !== undefined) basePayload.content = updates.content
+      if (updates.status !== undefined) basePayload.status = updates.status
+      if (updates.isStarred !== undefined) basePayload.is_starred = updates.isStarred
+      if (updates.tags !== undefined) basePayload.tags = updates.tags
       if (updates.scheduledFor !== undefined) {
-        updatePayload.scheduled_for = sanitizeScheduledTimestamp(updates.scheduledFor)
+        basePayload.scheduled_for = sanitizeScheduledTimestamp(updates.scheduledFor)
       }
 
-      const { error } = await supabase
+      if (hasExtendedDraftsColumns !== false) {
+        const extendedPayload: Record<string, unknown> = {
+          ...basePayload,
+          version: nextVersion,
+          last_saved_at: nextLastSavedAt,
+        }
+        if (updates.contentJson !== undefined) {
+          extendedPayload.content_json = (updates.contentJson as Json) ?? null
+        }
+
+        const { error } = await supabase
+          .from('drafts')
+          .update(extendedPayload as DraftUpdate)
+          .eq('id', id)
+          .eq('user_id', userId)
+
+        if (!error) {
+          hasExtendedDraftsColumns = true
+          return { error: null }
+        }
+
+        if (isMissingColumnError(error)) {
+          hasExtendedDraftsColumns = false
+          // Fall through to update with basePayload
+        } else {
+          return { error: new Error(error.message) }
+        }
+      }
+
+      // Update with base payload supported across all database versions
+      const { error: baseError } = await supabase
         .from('drafts')
-        .update(updatePayload)
+        .update(basePayload as DraftUpdate)
         .eq('id', id)
         .eq('user_id', userId)
 
-      if (error) {
-        return { error: new Error(error.message) }
+      if (baseError) {
+        return { error: new Error(baseError.message) }
       }
       return { error: null }
     } catch (err) {
@@ -307,7 +407,7 @@ export const draftService = {
     }
 
     try {
-      if (permanent) {
+      if (permanent || hasExtendedDraftsColumns === false) {
         const { error } = await supabase
           .from('drafts')
           .delete()
@@ -322,7 +422,20 @@ export const draftService = {
           .eq('id', id)
           .eq('user_id', userId)
 
-        if (error) return { error: new Error(error.message) }
+        if (error) {
+          if (isMissingColumnError(error)) {
+            hasExtendedDraftsColumns = false
+            const { error: delError } = await supabase
+              .from('drafts')
+              .delete()
+              .eq('id', id)
+              .eq('user_id', userId)
+
+            if (delError) return { error: new Error(delError.message) }
+          } else {
+            return { error: new Error(error.message) }
+          }
+        }
       }
       return { error: null }
     } catch (err) {
@@ -347,7 +460,12 @@ export const draftService = {
         content_json: (draft.contentJson as Json) ?? null,
       })
 
-      if (error) return { error: new Error(error.message) }
+      if (error) {
+        if (isMissingTableError(error)) {
+          return { error: null }
+        }
+        return { error: new Error(error.message) }
+      }
       return { error: null }
     } catch (err) {
       return {
@@ -370,7 +488,12 @@ export const draftService = {
         .eq('user_id', userId)
         .order('version_number', { ascending: false })
 
-      if (error) return { data: [], error: new Error(error.message) }
+      if (error) {
+        if (isMissingTableError(error)) {
+          return { data: [], error: null }
+        }
+        return { data: [], error: new Error(error.message) }
+      }
 
       const versions: DraftVersion[] = (data || []).map((v) => ({
         id: v.id,

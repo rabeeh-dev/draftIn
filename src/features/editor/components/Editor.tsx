@@ -32,6 +32,10 @@ export function Editor() {
     editorProps: {
       attributes: {
         class: 'tiptap focus:outline-none w-full min-h-[380px] md:min-h-[480px] text-sm md:text-base leading-relaxed text-foreground font-sans prose dark:prose-invert max-w-none',
+        'data-gramm': 'false',
+        'data-gramm_editor': 'false',
+        'data-enable-grammarly': 'false',
+        spellcheck: 'false',
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
