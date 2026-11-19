@@ -182,7 +182,19 @@ export function AuthGuard({ children }: { children: ReactNode }) {
 export function AdminGuard({ children }: { children: ReactNode }) {
   const { isAdmin, isSuspended, user } = useAuth()
   const { navigate } = useRouter()
-  const isAdminAuthenticated = adminAuthService.isAuthenticated() || isAdmin
+  const [isAdminAuthed, setIsAdminAuthed] = useState(() => adminAuthService.isAuthenticated())
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setIsAdminAuthed(adminAuthService.isAuthenticated())
+    }
+    window.addEventListener('draftin:admin-auth-changed', handleAuthChange)
+    window.addEventListener('storage', handleAuthChange)
+    return () => {
+      window.removeEventListener('draftin:admin-auth-changed', handleAuthChange)
+      window.removeEventListener('storage', handleAuthChange)
+    }
+  }, [])
 
   if (isSuspended) {
     return (
@@ -209,7 +221,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   }
 
   // 1. If authenticated as admin via username/password or mock admin claim
-  if (isAdminAuthenticated) {
+  if (isAdminAuthed || isAdmin) {
     return <>{children}</>
   }
 
@@ -244,5 +256,5 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   }
 
   // 3. Otherwise render the dedicated Admin Login Page
-  return <AdminLoginPage />
+  return <AdminLoginPage onSuccess={() => setIsAdminAuthed(true)} />
 }

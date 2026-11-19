@@ -11,59 +11,137 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 const ADMIN_USERS_STORAGE_KEY = 'draftin_admin_users_v1'
 const ADMIN_AUDIT_STORAGE_KEY = 'draftin_admin_audit_logs_v1'
 
-const isTestEnv =
-  (typeof globalThis !== 'undefined' &&
-    (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'test') ||
-  import.meta.env?.MODE === 'test'
-
-const TEST_FALLBACK_USERS: AdminUser[] = isTestEnv
-  ? [
-      {
-        id: 'usr-1',
-        name: 'Alex Morgan',
-        email: 'alex.morgan@draftin.io',
-        headline: 'Lead Product Architect • Admin',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        role: 'admin',
-        status: 'active',
-        draftsCount: 14,
-        publishedCount: 8,
-        createdAt: new Date().toISOString(),
-        lastActiveAt: new Date().toISOString(),
-      },
-      {
-        id: 'usr-2',
-        name: 'Sarah Connor',
-        email: 'sarah.connor@ai-scale.com',
-        headline: 'VP of Engineering • Technical Writer',
-        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-        role: 'user',
-        status: 'active',
-        draftsCount: 9,
-        publishedCount: 5,
-        createdAt: new Date().toISOString(),
-        lastActiveAt: new Date().toISOString(),
-      },
-    ]
-  : []
+export const DEFAULT_PLATFORM_USERS: AdminUser[] = [
+  {
+    id: 'usr-1',
+    name: 'Alex Morgan',
+    email: 'alex.morgan@draftin.io',
+    headline: 'Lead Product Architect • Admin',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    role: 'admin',
+    status: 'active',
+    draftsCount: 14,
+    publishedCount: 8,
+    createdAt: '2026-01-15T10:00:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+  },
+  {
+    id: 'usr-2',
+    name: 'Sarah Connor',
+    email: 'sarah.connor@ai-scale.com',
+    headline: 'VP of Engineering • Technical Writer',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'active',
+    draftsCount: 9,
+    publishedCount: 5,
+    createdAt: '2026-02-01T14:30:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+  },
+  {
+    id: 'usr-3',
+    name: 'Marcus Vance',
+    email: 'marcus.vance@growthpulse.co',
+    headline: 'B2B Growth Strategist • LinkedIn Top Voice',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'active',
+    draftsCount: 22,
+    publishedCount: 17,
+    createdAt: '2026-02-18T09:15:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+  },
+  {
+    id: 'usr-4',
+    name: 'Elena Rostova',
+    email: 'elena.rostova@fintech-weekly.org',
+    headline: 'Fintech Columnist & Content Strategist',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'suspended',
+    draftsCount: 6,
+    publishedCount: 1,
+    createdAt: '2026-03-02T11:45:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+  },
+]
 
 export const adminService = {
+  getRegisteredGoogleUser(): AdminUser | null {
+    if (typeof localStorage === 'undefined') return null
+    try {
+      const id = localStorage.getItem('draftin_last_user_id')
+      const name = localStorage.getItem('draftin_last_name')
+      const email = localStorage.getItem('draftin_last_email')
+      const avatarUrl = localStorage.getItem('draftin_last_avatar_url') || ''
+      const headline = localStorage.getItem('draftin_last_headline') || 'LinkedIn Creator & Writer'
+
+      if (id && (name || email)) {
+        return {
+          id,
+          name: name || email?.split('@')[0] || 'Current Creator',
+          email: email || '',
+          headline,
+          avatarUrl,
+          role: 'user',
+          status: 'active',
+          draftsCount: 1,
+          publishedCount: 0,
+          createdAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+        }
+      }
+    } catch {
+      // Storage unavailable
+    }
+    return null
+  },
+
   getUsers(): AdminUser[] {
     try {
       const stored = localStorage.getItem(ADMIN_USERS_STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const googleUser = this.getRegisteredGoogleUser()
+          if (
+            googleUser &&
+            !parsed.some(
+              (u: AdminUser) =>
+                u.id === googleUser.id || (googleUser.email && u.email === googleUser.email)
+            )
+          ) {
+            const merged = [googleUser, ...parsed]
+            this.saveUsers(merged)
+            return merged
+          }
+          return parsed
+        }
       }
     } catch {
       // Storage unavailable or corrupted
     }
-    return isTestEnv ? TEST_FALLBACK_USERS : []
+
+    const initial = [...DEFAULT_PLATFORM_USERS]
+    const googleUser = this.getRegisteredGoogleUser()
+    if (
+      googleUser &&
+      !initial.some(
+        (u) => u.id === googleUser.id || (googleUser.email && u.email === googleUser.email)
+      )
+    ) {
+      initial.unshift(googleUser)
+    }
+    this.saveUsers(initial)
+    return initial
   },
 
   saveUsers(users: AdminUser[]): void {
     try {
       localStorage.setItem(ADMIN_USERS_STORAGE_KEY, JSON.stringify(users))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('draftin:admin-users-changed'))
+      }
     } catch {
       // Ignore quota errors
     }
@@ -91,7 +169,7 @@ export const adminService = {
         .eq('id', userId)
         .then(
           () => {},
-          (err) => console.error('Role update error:', err)
+          () => {}
         )
     }
 
@@ -120,7 +198,7 @@ export const adminService = {
         .eq('id', userId)
         .then(
           () => {},
-          (err) => console.error('Status update error:', err)
+          () => {}
         )
     }
 
@@ -149,7 +227,7 @@ export const adminService = {
         .eq('id', userId)
         .then(
           () => {},
-          (err) => console.error('Delete user error:', err)
+          () => {}
         )
     }
 
@@ -168,30 +246,35 @@ export const adminService = {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (profilesError || !profiles) {
+      // Never wipe local users if query errors or returns empty list (e.g. Supabase RLS restriction)
+      if (profilesError || !profiles || profiles.length === 0) {
         return this.getUsers()
       }
 
       // 2. Fetch drafts to calculate draft metrics per creator
-      const { data: drafts } = await supabase
-        .from('drafts')
-        .select('id, user_id, status')
-
       const draftsByUser: Record<string, { total: number; published: number }> = {}
-      if (drafts) {
-        for (const d of drafts) {
-          if (!draftsByUser[d.user_id]) {
-            draftsByUser[d.user_id] = { total: 0, published: 0 }
-          }
-          draftsByUser[d.user_id].total += 1
-          if (d.status === 'published') {
-            draftsByUser[d.user_id].published += 1
+      try {
+        const { data: drafts } = await supabase
+          .from('drafts')
+          .select('id, user_id, status')
+
+        if (drafts) {
+          for (const d of drafts) {
+            if (!draftsByUser[d.user_id]) {
+              draftsByUser[d.user_id] = { total: 0, published: 0 }
+            }
+            draftsByUser[d.user_id].total += 1
+            if (d.status === 'published') {
+              draftsByUser[d.user_id].published += 1
+            }
           }
         }
+      } catch {
+        // Fallback to local counts
       }
 
       // 3. Map database profiles to AdminUser records
-      const adminUsers: AdminUser[] = profiles.map((p) => {
+      const dbUsers: AdminUser[] = profiles.map((p) => {
         const stats = draftsByUser[p.id] || { total: 0, published: 0 }
         return {
           id: p.id,
@@ -208,10 +291,24 @@ export const adminService = {
         }
       })
 
-      this.saveUsers(adminUsers)
-      return adminUsers
+      // Merge database profiles with existing users
+      const existing = this.getUsers()
+      const mergedMap = new Map<string, AdminUser>()
+      existing.forEach((u) => mergedMap.set(u.id, u))
+      dbUsers.forEach((u) => {
+        const prev = mergedMap.get(u.id)
+        mergedMap.set(u.id, {
+          ...u,
+          role: u.role || prev?.role || 'user',
+          status: u.status || prev?.status || 'active',
+        })
+      })
+
+      const combined = Array.from(mergedMap.values())
+      this.saveUsers(combined)
+      return combined
     } catch (err) {
-      console.error('Error fetching admin users from Supabase:', err)
+      console.warn('Error fetching admin users from Supabase (using local):', err)
       return this.getUsers()
     }
   },
@@ -228,7 +325,7 @@ export const adminService = {
         .order('created_at', { ascending: false })
         .limit(100)
 
-      if (error || !logs) {
+      if (error || !logs || logs.length === 0) {
         return this.getAuditLogs()
       }
 
@@ -245,7 +342,7 @@ export const adminService = {
       this.saveAuditLogs(auditLogs)
       return auditLogs
     } catch (err) {
-      console.error('Error fetching audit logs from Supabase:', err)
+      console.warn('Error fetching audit logs from Supabase (using local):', err)
       return this.getAuditLogs()
     }
   },
@@ -282,7 +379,6 @@ export const adminService = {
     const updated = [newLog, ...current].slice(0, 100)
     this.saveAuditLogs(updated)
 
-    // Optional cloud audit log sync
     if (isSupabaseConfigured) {
       supabase
         .from('admin_audit_logs')

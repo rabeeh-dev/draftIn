@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import type { User, Session } from '@supabase/supabase-js'
 import { AuthContext } from '@/features/auth/context/AuthContext'
 import type { AuthContextType } from '@/features/auth/types/auth.types'
@@ -10,6 +10,7 @@ import { entitlementsService } from '@/features/billing/services/entitlements.se
 import { checkSystemHealth } from '@/lib/health'
 import { logger } from '@/lib/logger'
 import { adminAuthService } from '@/features/admin/services/admin-auth.service'
+import { adminService } from '@/features/admin/services/admin.service'
 import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
 import { LinkedInPreview } from '@/features/preview/components/LinkedInPreview'
 import { DraftStoreProvider } from '@/stores/draft.store'
@@ -255,6 +256,35 @@ describe('Phase 08-14: Production Hardening, Security & Reliability', () => {
       expect(adminAuthService.isAuthenticated()).toBe(false)
     })
 
+    it('authenticates successfully with case-insensitive admin username and password "123"', () => {
+      const result = adminAuthService.login('Admin', '123')
+      expect(result.success).toBe(true)
+      expect(adminAuthService.isAuthenticated()).toBe(true)
+
+      adminAuthService.logout()
+      expect(adminAuthService.isAuthenticated()).toBe(false)
+    })
+
+    it('triggers onSuccess callback in AdminLoginPage upon valid login', () => {
+      const handleSuccess = vi.fn()
+      render(
+        <RouterProvider>
+          <AdminLoginPage onSuccess={handleSuccess} />
+        </RouterProvider>
+      )
+
+      const userInput = screen.getByPlaceholderText(/e\.g\. admin/i)
+      const passInput = screen.getByPlaceholderText(/enter administrator password/i)
+      const submitBtn = screen.getByRole('button', { name: /sign in as administrator/i })
+
+      fireEvent.change(userInput, { target: { value: 'admin' } })
+      fireEvent.change(passInput, { target: { value: '123' } })
+      fireEvent.click(submitBtn)
+
+      expect(handleSuccess).toHaveBeenCalledTimes(1)
+      adminAuthService.logout()
+    })
+
     it('renders dedicated AdminLoginPage with username and password inputs', () => {
       render(
         <RouterProvider>
@@ -267,6 +297,26 @@ describe('Phase 08-14: Production Hardening, Security & Reliability', () => {
       expect(screen.getByPlaceholderText(/enter administrator password/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /sign in as administrator/i })).toBeInTheDocument()
       expect(screen.getByText(/return to writer workspace/i)).toBeInTheDocument()
+    })
+
+    it('guarantees adminService.getUsers() returns seed creators even when storage is empty', () => {
+      localStorage.removeItem('draftin_admin_users_v1')
+      const users = adminService.getUsers()
+      expect(Array.isArray(users)).toBe(true)
+      expect(users.length).toBeGreaterThanOrEqual(4)
+      expect(users.some((u) => u.name === 'Alex Morgan')).toBe(true)
+      expect(users.some((u) => u.name === 'Sarah Connor')).toBe(true)
+    })
+
+    it('adminService dynamically incorporates logged-in Google creator into user management list', () => {
+      localStorage.setItem('draftin_last_user_id', 'usr-google-999')
+      localStorage.setItem('draftin_last_name', 'Sundar Pichai')
+      localStorage.setItem('draftin_last_email', 'sundar@google.com')
+
+      const users = adminService.getUsers()
+      const found = users.find((u) => u.id === 'usr-google-999' || u.email === 'sundar@google.com')
+      expect(found).toBeDefined()
+      expect(found?.name).toBe('Sundar Pichai')
     })
   })
 

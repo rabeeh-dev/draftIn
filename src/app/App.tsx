@@ -50,9 +50,9 @@ function AppContent() {
     return <LoginPage />
   }
 
-  // 4. Admin route hierarchy (/admin, /admin/login, /admin/users, /admin/activity, /admin/settings)
+  // 4. Admin route hierarchy (/admin, /admin/login, /admin/users)
   if (path === '/admin/login') {
-    return <AdminLoginPage />
+    return <AdminLoginPage onSuccess={() => navigate('/admin', { replace: true })} />
   }
 
   if (path === '/admin' || path.startsWith('/admin/')) {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { adminAuthService } from '../services/admin-auth.service'
 import { useRouter } from '@/app/router'
 import { Button } from '@/components/ui/button'
@@ -14,13 +14,28 @@ import {
   KeyRound,
 } from 'lucide-react'
 
-export function AdminLoginPage() {
-  const { navigate } = useRouter()
+interface AdminLoginPageProps {
+  onSuccess?: () => void
+}
+
+export function AdminLoginPage({ onSuccess }: AdminLoginPageProps = {}) {
+  const { navigate, path } = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // If already authenticated on mount, invoke onSuccess and ensure navigation
+  useEffect(() => {
+    if (adminAuthService.isAuthenticated()) {
+      onSuccess?.()
+      if (path !== '/admin') {
+        navigate('/admin', { replace: true })
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -31,7 +46,10 @@ export function AdminLoginPage() {
     setIsSubmitting(false)
 
     if (result.success) {
-      navigate('/admin', { replace: true })
+      onSuccess?.()
+      if (path !== '/admin') {
+        navigate('/admin', { replace: true })
+      }
     } else {
       setErrorMessage(result.error || 'Authentication failed. Please verify credentials.')
     }

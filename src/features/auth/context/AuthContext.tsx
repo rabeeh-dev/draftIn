@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { authService } from '../services/auth.service'
+import { adminService } from '@/features/admin/services/admin.service'
 import { AuthContext } from './auth-context-def'
 export { AuthContext }
 import type { User, Session, AuthError } from '@supabase/supabase-js'
@@ -54,6 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore query errors in offline/unmigrated mode
     }
 
+    // 3. Fallback to local admin moderation store
+    try {
+      const localUsers = adminService.getUsers()
+      const match = localUsers.find(
+        (u) => u.id === currentUser.id || (currentUser.email && u.email === currentUser.email)
+      )
+      if (match) {
+        if (match.role === 'admin') resolvedRole = 'admin'
+        if (match.status === 'suspended') resolvedStatus = 'suspended'
+      }
+    } catch {
+      // Ignore local storage error
+    }
+
     return { role: resolvedRole, status: resolvedStatus }
   }
 
@@ -80,8 +95,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
     }
 
+    const handleAdminUsersChange = () => {
+      if (user && !isCancelled) {
+        resolveUserProfile(user).then(({ role: resolvedRole, status: resolvedStatus }) => {
+          if (!isCancelled) {
+            setRole(resolvedRole)
+            setIsAdmin(resolvedRole === 'admin')
+            setStatus(resolvedStatus)
+            setIsSuspended(resolvedStatus === 'suspended')
+          }
+        })
+      }
+    }
+
+    window.addEventListener('draftin:admin-users-changed', handleAdminUsersChange)
+
     return () => {
       isCancelled = true
+      window.removeEventListener('draftin:admin-users-changed', handleAdminUsersChange)
     }
   }, [user])
 
