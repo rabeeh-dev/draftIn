@@ -11,13 +11,22 @@ import {
 import type { Draft, DraftFilter, SortOption, UserProfile, SaveStatus } from '@/types'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { draftService } from '@/features/drafts/services/draft.service'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
-const INITIAL_PROFILE: UserProfile = {
-  id: 'user-1',
+const TEST_PROFILE: UserProfile = {
+  id: 'test-user-1',
   name: 'Alex Morgan',
   headline: 'Product Engineer • Building @draftin • TypeScript & React Enthusiast',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   username: 'alexmorgan',
+}
+
+const EMPTY_PROFILE: UserProfile = {
+  id: '',
+  name: '',
+  headline: 'LinkedIn Creator & Writer',
+  avatarUrl: '',
+  username: '',
 }
 
 interface DraftStoreContextType {
@@ -104,13 +113,67 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   )
-  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_PROFILE)
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    if (user?.id) {
+      try {
+        const stored = localStorage.getItem(`draftin_profile_${user.id}`)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (parsed && typeof parsed === 'object') return parsed
+        }
+      } catch {
+        // Storage unavailable or unparseable
+      }
+
+      return {
+        id: user.id,
+        name:
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split('@')[0] ||
+          'Creator',
+        headline: 'LinkedIn Creator & Writer',
+        avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+        username: user.email?.split('@')[0] || user.id.slice(0, 8),
+      }
+    }
+    if (isTestEnv) {
+      return TEST_PROFILE
+    }
+    return EMPTY_PROFILE
+  })
   const [currentView, setCurrentView] = useState<'workspace' | 'login' | 'admin'>('workspace')
 
   const previousUserIdRef = useRef<string | null>(user?.id || null)
 
   const updateUserProfile = (updated: Partial<UserProfile>) => {
-    setUserProfile((prev) => ({ ...prev, ...updated }))
+    setUserProfile((prev) => {
+      const next = { ...prev, ...updated }
+      if (user?.id) {
+        try {
+          localStorage.setItem(`draftin_profile_${user.id}`, JSON.stringify(next))
+        } catch {
+          // Ignore storage quota errors
+        }
+        if (isSupabaseConfigured) {
+          supabase
+            .from('profiles')
+            .update({
+              name: next.name,
+              headline: next.headline,
+              avatar_url: next.avatarUrl || null,
+              username: next.username || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', user.id)
+            .then(
+              () => {},
+              (err) => console.error('Failed to update profile in Supabase:', err)
+            )
+        }
+      }
+      return next
+    })
   }
 
   const activeDraft = useMemo(() => {
@@ -152,6 +215,72 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         setDrafts(cached)
         setActiveDraftId(cached.length > 0 ? cached[0].id : null)
 
+        // Sync profile from local storage / OAuth metadata
+        const userProfileKey = `draftin_profile_${currentUserId}`
+        const googleName =
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          user?.email?.split('@')[0] ||
+          'Creator'
+        const googleAvatar =
+          user?.user_metadata?.avatar_url ||
+          user?.user_metadata?.picture ||
+          ''
+        const userHandle = user?.email?.split('@')[0] || currentUserId.slice(0, 8)
+
+        let initialProf: UserProfile = {
+          id: currentUserId,
+          name: googleName,
+          headline: 'LinkedIn Creator & Writer',
+          avatarUrl: googleAvatar,
+          username: userHandle,
+        }
+
+        try {
+          const cachedProfStr = localStorage.getItem(userProfileKey)
+          if (cachedProfStr) {
+            const parsed = JSON.parse(cachedProfStr)
+            initialProf = {
+              ...initialProf,
+              ...parsed,
+              id: currentUserId,
+              avatarUrl: parsed.avatarUrl || googleAvatar,
+              name: parsed.name || googleName,
+            }
+          }
+        } catch {
+          // Ignore parse errors on cached profile
+        }
+
+        setUserProfile(initialProf)
+
+        // Query Supabase profiles
+        if (isSupabaseConfigured) {
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUserId)
+            .single()
+            .then(({ data: profileData, error: profileError }) => {
+              if (isCancelled || profileError || !profileData) return
+              setUserProfile((prev) => {
+                const merged: UserProfile = {
+                  id: currentUserId,
+                  name: profileData.name || prev.name || googleName,
+                  headline: profileData.headline || prev.headline || 'LinkedIn Creator & Writer',
+                  avatarUrl: profileData.avatar_url || prev.avatarUrl || googleAvatar,
+                  username: profileData.username || prev.username || userHandle,
+                }
+                try {
+                  localStorage.setItem(userProfileKey, JSON.stringify(merged))
+                } catch {
+                  // Ignore quota errors
+                }
+                return merged
+              })
+            })
+        }
+
         return draftService.fetchDrafts(currentUserId)
       }).then((result) => {
         if (isCancelled || !result) return
@@ -177,9 +306,12 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
         setActiveDraftId(null)
         setSaveStatus('saved')
         setSyncError(null)
+        if (!isTestEnv) {
+          setUserProfile(EMPTY_PROFILE)
+        }
       })
     }
-  }, [user?.id])
+  }, [user?.id, user?.email, user?.user_metadata, isTestEnv])
 
   // Autosave engine: Debounce changes by 1000ms
   useEffect(() => {

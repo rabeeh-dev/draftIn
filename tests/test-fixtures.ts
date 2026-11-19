@@ -1,4 +1,5 @@
 import type { Draft } from '@/types'
+import type { AdminUser, AdminAuditLog } from '@/features/admin/types/admin.types'
 
 export const TEST_FIXTURE_DRAFTS: Draft[] = [
   {
@@ -41,5 +42,103 @@ export const TEST_FIXTURE_DRAFTS: Draft[] = [
     tags: ['Marketing', 'Writing'],
     createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+]
+
+export const TEST_FIXTURE_ADMIN_USERS: AdminUser[] = [
+  {
+    id: 'usr-1',
+    name: 'Alex Morgan',
+    email: 'alex.morgan@draftin.io',
+    headline: 'Lead Product Architect • Admin',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    role: 'admin',
+    status: 'active',
+    draftsCount: 14,
+    publishedCount: 8,
+    createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
+    lastActiveAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+  },
+  {
+    id: 'usr-2',
+    name: 'Sarah Connor',
+    email: 'sarah.connor@ai-scale.com',
+    headline: 'VP of Engineering • Technical Writer',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'active',
+    draftsCount: 9,
+    publishedCount: 5,
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+    lastActiveAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+  },
+  {
+    id: 'usr-3',
+    name: 'Marcus Vance',
+    email: 'marcus.v@growthventures.co',
+    headline: 'Growth Marketer • Content Lead',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'suspended',
+    draftsCount: 3,
+    publishedCount: 1,
+    createdAt: new Date(Date.now() - 86400000 * 18).toISOString(),
+    lastActiveAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+  {
+    id: 'usr-4',
+    name: 'Elena Rostova',
+    email: 'elena.rostova@designops.dev',
+    headline: 'Product Designer • UX Advocate',
+    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+    role: 'user',
+    status: 'active',
+    draftsCount: 22,
+    publishedCount: 16,
+    createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
+    lastActiveAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+  },
+  {
+    id: 'usr-5',
+    name: 'David Kim',
+    email: 'david.kim@cloudinfra.net',
+    headline: 'Staff SRE • Tech Creator',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    role: 'moderator',
+    status: 'active',
+    draftsCount: 7,
+    publishedCount: 4,
+    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+    lastActiveAt: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
+  },
+]
+
+export const TEST_FIXTURE_AUDIT_LOGS: AdminAuditLog[] = [
+  {
+    id: 'log-1',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-3',
+    targetUserName: 'Marcus Vance',
+    action: 'status_change',
+    details: 'Account suspended for policy review',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+  },
+  {
+    id: 'log-2',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-5',
+    targetUserName: 'David Kim',
+    action: 'role_change',
+    details: 'Granted moderator permissions',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 14).toISOString(),
+  },
+  {
+    id: 'log-3',
+    adminEmail: 'admin@draftin.io',
+    targetUserId: 'usr-1',
+    targetUserName: 'Alex Morgan',
+    action: 'role_change',
+    details: 'Verified administrator account',
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
   },
 ]

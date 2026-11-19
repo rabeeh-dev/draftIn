@@ -1,106 +1,51 @@
-import type { AdminUser, AdminStats, UserRole, UserStatus, AdminAuditLog } from '../types/admin.types'
+import type {
+  AdminUser,
+  AdminStats,
+  UserRole,
+  UserStatus,
+  AdminAuditLog,
+  AdminAuditAction,
+} from '../types/admin.types'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 
 const ADMIN_USERS_STORAGE_KEY = 'draftin_admin_users_v1'
 const ADMIN_AUDIT_STORAGE_KEY = 'draftin_admin_audit_logs_v1'
 
-const INITIAL_AUDIT_LOGS: AdminAuditLog[] = [
-  {
-    id: 'log-1',
-    adminEmail: 'admin@draftin.io',
-    targetUserId: 'usr-3',
-    targetUserName: 'Marcus Vance',
-    action: 'status_change',
-    details: 'Account suspended for policy review',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: 'log-2',
-    adminEmail: 'admin@draftin.io',
-    targetUserId: 'usr-5',
-    targetUserName: 'David Kim',
-    action: 'role_change',
-    details: 'Granted moderator permissions',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 14).toISOString(),
-  },
-  {
-    id: 'log-3',
-    adminEmail: 'admin@draftin.io',
-    targetUserId: 'usr-1',
-    targetUserName: 'Alex Morgan',
-    action: 'role_change',
-    details: 'Verified administrator account',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-  },
-]
+const isTestEnv =
+  (typeof globalThis !== 'undefined' &&
+    (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'test') ||
+  import.meta.env?.MODE === 'test'
 
-const INITIAL_ADMIN_USERS: AdminUser[] = [
-  {
-    id: 'usr-1',
-    name: 'Alex Morgan',
-    email: 'alex.morgan@draftin.io',
-    headline: 'Lead Product Architect • Admin',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    role: 'admin',
-    status: 'active',
-    draftsCount: 14,
-    publishedCount: 8,
-    createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-    lastActiveAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-  },
-  {
-    id: 'usr-2',
-    name: 'Sarah Connor',
-    email: 'sarah.connor@ai-scale.com',
-    headline: 'VP of Engineering • Technical Writer',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
-    role: 'user',
-    status: 'active',
-    draftsCount: 9,
-    publishedCount: 5,
-    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-    lastActiveAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-  },
-  {
-    id: 'usr-3',
-    name: 'Marcus Vance',
-    email: 'marcus.v@growthventures.co',
-    headline: 'Growth Marketer • Content Lead',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    role: 'user',
-    status: 'suspended',
-    draftsCount: 3,
-    publishedCount: 1,
-    createdAt: new Date(Date.now() - 86400000 * 18).toISOString(),
-    lastActiveAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-  },
-  {
-    id: 'usr-4',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@designops.dev',
-    headline: 'Product Designer • UX Advocate',
-    avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-    role: 'user',
-    status: 'active',
-    draftsCount: 22,
-    publishedCount: 16,
-    createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-    lastActiveAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
-  {
-    id: 'usr-5',
-    name: 'David Kim',
-    email: 'david.kim@cloudinfra.net',
-    headline: 'Staff SRE • Tech Creator',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    role: 'moderator',
-    status: 'active',
-    draftsCount: 7,
-    publishedCount: 4,
-    createdAt: new Date(Date.now() - 86400000 * 12).toISOString(),
-    lastActiveAt: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-  },
-]
+const TEST_FALLBACK_USERS: AdminUser[] = isTestEnv
+  ? [
+      {
+        id: 'usr-1',
+        name: 'Alex Morgan',
+        email: 'alex.morgan@draftin.io',
+        headline: 'Lead Product Architect • Admin',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        role: 'admin',
+        status: 'active',
+        draftsCount: 14,
+        publishedCount: 8,
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+      },
+      {
+        id: 'usr-2',
+        name: 'Sarah Connor',
+        email: 'sarah.connor@ai-scale.com',
+        headline: 'VP of Engineering • Technical Writer',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+        role: 'user',
+        status: 'active',
+        draftsCount: 9,
+        publishedCount: 5,
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+      },
+    ]
+  : []
 
 export const adminService = {
   getUsers(): AdminUser[] {
@@ -113,7 +58,7 @@ export const adminService = {
     } catch {
       // Storage unavailable or corrupted
     }
-    return INITIAL_ADMIN_USERS
+    return isTestEnv ? TEST_FALLBACK_USERS : []
   },
 
   saveUsers(users: AdminUser[]): void {
@@ -138,6 +83,17 @@ export const adminService = {
       details: `Updated role from ${targetUser?.role || 'unknown'} to ${newRole}`,
     })
 
+    if (isSupabaseConfigured) {
+      supabase
+        .from('profiles')
+        .update({ role: newRole, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .then(
+          () => {},
+          (err) => console.error('Role update error:', err)
+        )
+    }
+
     return updated
   },
 
@@ -154,6 +110,17 @@ export const adminService = {
       action: 'status_change',
       details: `Updated account status from ${targetUser?.status || 'unknown'} to ${newStatus}`,
     })
+
+    if (isSupabaseConfigured) {
+      supabase
+        .from('profiles')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+        .then(
+          () => {},
+          (err) => console.error('Status update error:', err)
+        )
+    }
 
     return updated
   },
@@ -172,7 +139,112 @@ export const adminService = {
       details: `Permanently removed account ${targetUser?.email || userId}`,
     })
 
+    if (isSupabaseConfigured) {
+      supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+        .then(
+          () => {},
+          (err) => console.error('Delete user error:', err)
+        )
+    }
+
     return updated
+  },
+
+  async fetchUsersFromSupabase(): Promise<AdminUser[]> {
+    if (!isSupabaseConfigured) {
+      return this.getUsers()
+    }
+
+    try {
+      // 1. Fetch real profiles from Supabase
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (profilesError || !profiles) {
+        return this.getUsers()
+      }
+
+      // 2. Fetch drafts to calculate draft metrics per creator
+      const { data: drafts } = await supabase
+        .from('drafts')
+        .select('id, user_id, status')
+
+      const draftsByUser: Record<string, { total: number; published: number }> = {}
+      if (drafts) {
+        for (const d of drafts) {
+          if (!draftsByUser[d.user_id]) {
+            draftsByUser[d.user_id] = { total: 0, published: 0 }
+          }
+          draftsByUser[d.user_id].total += 1
+          if (d.status === 'published') {
+            draftsByUser[d.user_id].published += 1
+          }
+        }
+      }
+
+      // 3. Map database profiles to AdminUser records
+      const adminUsers: AdminUser[] = profiles.map((p) => {
+        const stats = draftsByUser[p.id] || { total: 0, published: 0 }
+        return {
+          id: p.id,
+          name: p.name || 'Creator',
+          email: p.email || '',
+          headline: p.headline || 'LinkedIn Creator & Writer',
+          avatarUrl: p.avatar_url || '',
+          role: (p.role as UserRole) || 'user',
+          status: (p.status as UserStatus) || 'active',
+          draftsCount: stats.total,
+          publishedCount: stats.published,
+          createdAt: p.created_at || new Date().toISOString(),
+          lastActiveAt: p.updated_at || p.created_at || new Date().toISOString(),
+        }
+      })
+
+      this.saveUsers(adminUsers)
+      return adminUsers
+    } catch (err) {
+      console.error('Error fetching admin users from Supabase:', err)
+      return this.getUsers()
+    }
+  },
+
+  async fetchAuditLogsFromSupabase(): Promise<AdminAuditLog[]> {
+    if (!isSupabaseConfigured) {
+      return this.getAuditLogs()
+    }
+
+    try {
+      const { data: logs, error } = await supabase
+        .from('admin_audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (error || !logs) {
+        return this.getAuditLogs()
+      }
+
+      const auditLogs: AdminAuditLog[] = logs.map((l) => ({
+        id: l.id,
+        adminEmail: l.admin_email || 'admin@draftin.io',
+        targetUserId: l.target_user_id || undefined,
+        targetUserName: l.target_user_name || undefined,
+        action: (l.action as AdminAuditAction) || 'system_setting',
+        details: l.details || '',
+        createdAt: l.created_at,
+      }))
+
+      this.saveAuditLogs(auditLogs)
+      return auditLogs
+    } catch (err) {
+      console.error('Error fetching audit logs from Supabase:', err)
+      return this.getAuditLogs()
+    }
   },
 
   getAuditLogs(): AdminAuditLog[] {
@@ -185,7 +257,7 @@ export const adminService = {
     } catch {
       // Storage unavailable or corrupted
     }
-    return INITIAL_AUDIT_LOGS
+    return []
   },
 
   saveAuditLogs(logs: AdminAuditLog[]): void {

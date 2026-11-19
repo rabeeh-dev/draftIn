@@ -52,7 +52,7 @@ export function AppHeader() {
 
           <Badge variant="outline" className="text-[10px] gap-1 font-normal hidden sm:inline-flex">
             <Sparkles className="size-3 text-amber-500" />
-            <span>{userProfile.name}</span>
+            <span>{userProfile.name || user?.user_metadata?.full_name || 'Creator'}</span>
           </Badge>
         </div>
       </header>

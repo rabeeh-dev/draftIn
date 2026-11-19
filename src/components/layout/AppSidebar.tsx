@@ -294,11 +294,11 @@ export function AppSidebar() {
               >
                 <Avatar size="sm">
                   <AvatarImage
-                    src={user?.user_metadata?.avatar_url || userProfile.avatarUrl}
-                    alt={user?.user_metadata?.full_name || userProfile.name}
+                    src={userProfile.avatarUrl || user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                    alt={userProfile.name || user?.user_metadata?.full_name || 'User'}
                   />
                   <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                    {(user?.email?.[0] || userProfile.name.slice(0, 1) || 'U').toUpperCase()}
+                    {((userProfile.name || user?.user_metadata?.full_name || user?.email || 'U')[0]).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 {isSidebarOpen && (
@@ -307,7 +307,7 @@ export function AppSidebar() {
                     onClick={() => navigate('/app/profile')}
                   >
                     <p className="truncate text-xs font-semibold text-foreground leading-none hover:underline">
-                      {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
+                      {userProfile.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Member'}
                     </p>
                     <p className="truncate text-[10px] text-muted-foreground mt-0.5">
                       {user?.email}

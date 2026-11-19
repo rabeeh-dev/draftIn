@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useDraftStore } from '@/stores/draft.store'
 import { useRouter } from '@/app/router'
@@ -26,6 +26,19 @@ export function UserProfilePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    let isCancelled = false
+    Promise.resolve().then(() => {
+      if (isCancelled) return
+      if (userProfile.name) setName(userProfile.name)
+      if (userProfile.headline) setHeadline(userProfile.headline)
+      if (userProfile.avatarUrl) setAvatarUrl(userProfile.avatarUrl)
+    })
+    return () => {
+      isCancelled = true
+    }
+  }, [userProfile.name, userProfile.headline, userProfile.avatarUrl])
 
   const publishedCount = drafts.filter((d) => d.status === 'published').length
 
@@ -107,6 +120,11 @@ export function UserProfilePage() {
         <div className="p-4 rounded-2xl border border-border bg-card space-y-1">
           <span className="text-[11px] font-semibold text-muted-foreground">Connected Account</span>
           <p className="text-sm font-bold text-foreground truncate">{user?.email || 'Guest Session'}</p>
+          {user?.id && (
+            <p className="text-[10px] text-muted-foreground/80 font-mono truncate" title={`User ID: ${user.id}`}>
+              UID: {user.id}
+            </p>
+          )}
           <div className="flex items-center gap-1.5 pt-1">
             <span className="size-2 rounded-full bg-emerald-500" />
             <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Google OAuth Verified</span>
@@ -136,7 +154,7 @@ export function UserProfilePage() {
           <Avatar size="lg" className="size-16 ring-2 ring-primary/20">
             <AvatarImage src={avatarUrl} alt={name} />
             <AvatarFallback className="text-base font-bold bg-primary/10 text-primary">
-              {name.slice(0, 2).toUpperCase() || 'CR'}
+              {(name || 'CR').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 space-y-1">
@@ -165,7 +183,7 @@ export function UserProfilePage() {
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex Morgan"
+              placeholder="e.g. Your Full Name"
               className="text-xs h-9"
               required
             />

@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { adminService } from '../services/admin.service'
 import type { AdminUser, UserRole, UserStatus, AdminAuditLog } from '../types/admin.types'
 import { useRouter } from '@/app/router'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,9 +95,27 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
     return list
   }, [users, searchQuery, roleFilter, statusFilter])
 
+  const { user: currentAdmin } = useAuth()
+  const adminEmail = currentAdmin?.email || 'admin@draftin.io'
+
+  useEffect(() => {
+    let isMounted = true
+    if (isSupabaseConfigured) {
+      adminService.fetchUsersFromSupabase().then((loaded) => {
+        if (isMounted) setUsers(loaded)
+      })
+      adminService.fetchAuditLogsFromSupabase().then((loadedLogs) => {
+        if (isMounted) setAuditLogs(loadedLogs)
+      })
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   const handleToggleStatus = (user: AdminUser) => {
     const nextStatus: UserStatus = user.status === 'active' ? 'suspended' : 'active'
-    const updated = adminService.updateUserStatus(user.id, nextStatus)
+    const updated = adminService.updateUserStatus(user.id, nextStatus, adminEmail)
     setUsers(updated)
     setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === user.id) {
@@ -106,7 +125,7 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
 
   const handleToggleRole = (user: AdminUser) => {
     const nextRole: UserRole = user.role === 'admin' ? 'user' : 'admin'
-    const updated = adminService.updateUserRole(user.id, nextRole)
+    const updated = adminService.updateUserRole(user.id, nextRole, adminEmail)
     setUsers(updated)
     setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === user.id) {
@@ -116,7 +135,7 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
 
   const handleConfirmDelete = () => {
     if (!userToDelete) return
-    const updated = adminService.deleteUser(userToDelete.id)
+    const updated = adminService.deleteUser(userToDelete.id, adminEmail)
     setUsers(updated)
     setAuditLogs(adminService.getAuditLogs())
     if (selectedUser?.id === userToDelete.id) {
@@ -231,7 +250,18 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {auditLogs.map((log) => (
+                    {auditLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <History className="size-8 text-muted-foreground/50" />
+                            <p className="font-semibold text-xs text-foreground">No administrative activity recorded yet</p>
+                            <p className="text-[11px]">Audit events will appear when creator roles or account statuses are modified.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      auditLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-muted/20 transition-colors">
                         <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
                           {new Date(log.createdAt).toLocaleString(undefined, {
@@ -265,7 +295,8 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
                           {log.details}
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                   </tbody>
                 </table>
               </div>
@@ -465,8 +496,14 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
                     <td colSpan={6} className="py-12 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Users className="size-8 text-muted-foreground/50" />
-                        <p className="font-semibold text-xs text-foreground">No users match your filters</p>
-                        <p className="text-[11px]">Try adjusting your search query or reset status filters.</p>
+                        <p className="font-semibold text-xs text-foreground">
+                          {users.length === 0 ? 'No creators found' : 'No users match your filters'}
+                        </p>
+                        <p className="text-[11px]">
+                          {users.length === 0
+                            ? 'Registered users will appear here once they authenticate with Google.'
+                            : 'Try adjusting your search query or reset status filters.'}
+                        </p>
                       </div>
                     </td>
                   </tr>
@@ -488,7 +525,7 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
                             <Avatar size="default" className="size-10 ring-1 ring-border shrink-0">
                               <AvatarImage src={u.avatarUrl} alt={u.name} />
                               <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
-                                {u.name.slice(0, 2).toUpperCase()}
+                                {(u.name || 'CR').slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col overflow-hidden max-w-[220px]">
@@ -639,7 +676,7 @@ export function AdminPanel({ onBack, path: propPath }: AdminPanelProps) {
               <Avatar size="lg" className="size-12 ring-2 ring-primary/20">
                 <AvatarImage src={inspectedUser.avatarUrl} alt={inspectedUser.name} />
                 <AvatarFallback className="font-bold text-sm bg-primary/10 text-primary">
-                  {inspectedUser.name.slice(0, 2).toUpperCase()}
+                  {(inspectedUser.name || 'CR').slice(0, 2).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">

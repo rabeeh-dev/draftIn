@@ -31,8 +31,8 @@ export function ProfileCustomizerDialog({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
     onSave({
-      name: name.trim() || 'Alex Morgan',
-      headline: headline.trim() || 'Professional Creator',
+      name: name.trim() || profile.name || 'Creator',
+      headline: headline.trim() || profile.headline || 'LinkedIn Creator & Writer',
       avatarUrl: avatarUrl.trim() || undefined,
     })
     onOpenChange(false)
@@ -58,14 +58,14 @@ export function ProfileCustomizerDialog({
           <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
             <Avatar size="lg" className="ring-2 ring-[#0A66C2]/30">
               <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback>{name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarFallback>{((name || 'CR').slice(0, 2)).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex-1 space-y-1">
               <label className="text-xs font-semibold text-foreground">Avatar Image URL</label>
               <Input
                 value={avatarUrl}
                 onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
+                placeholder="https://lh3.googleusercontent.com/..."
                 className="text-xs h-8"
               />
             </div>
@@ -76,7 +76,7 @@ export function ProfileCustomizerDialog({
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alex Morgan"
+              placeholder="e.g. Your Full Name"
               className="text-xs h-9"
               required
             />

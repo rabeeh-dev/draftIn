@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useDraftStore } from '@/stores/draft.store'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import { PreviewHeader } from './PreviewHeader'
 import { ProfileCustomizerDialog } from './ProfileCustomizerDialog'
 import { LINKEDIN_COMPOSE_URL } from './PublishDialog'
@@ -26,9 +27,34 @@ import {
 
 export function LinkedInPreview() {
   const { activeDraft, userProfile, updateUserProfile, previewDevice } = useDraftStore()
+  const { user } = useAuth()
   const [isExpanded, setIsExpanded] = useState(false)
   const [showProfileCustomizer, setShowProfileCustomizer] = useState(false)
   const [copiedPublishText, setCopiedPublishText] = useState(false)
+
+  const authorName =
+    userProfile.name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split('@')[0] ||
+    'Creator'
+
+  const authorAvatar =
+    userProfile.avatarUrl ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    ''
+
+  const authorHeadline = userProfile.headline || 'LinkedIn Creator & Writer'
+
+  const authorId = user?.id || userProfile.id || ''
+
+  const authorInitials = useMemo(() => {
+    if (!authorName) return 'CR'
+    const parts = authorName.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }, [authorName])
 
   const content = activeDraft?.content || ''
   const isEmpty = isContentEmpty(content)
@@ -76,21 +102,34 @@ export function LinkedInPreview() {
           <div className="flex items-start justify-between p-3.5 pb-2">
             <div className="flex items-start gap-2.5">
               <Avatar size="default" className="size-11 ring-1 ring-border shrink-0">
-                <AvatarImage src={userProfile.avatarUrl} alt={userProfile.name} />
-                <AvatarFallback>{userProfile.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarImage src={authorAvatar} alt={authorName} />
+                <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                  {authorInitials}
+                </AvatarFallback>
               </Avatar>
 
               <div className="flex flex-col text-left overflow-hidden">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-foreground hover:text-[#0A66C2] hover:underline cursor-pointer leading-tight truncate">
-                    {userProfile.name}
+                    {authorName}
                   </span>
                   <span className="text-[11px] text-muted-foreground shrink-0">• 1st</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground line-clamp-1 leading-snug">
-                  {userProfile.headline}
+                  {authorHeadline}
                 </p>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                  {authorId ? (
+                    <>
+                      <span
+                        className="font-mono text-[9px] text-muted-foreground/80 hover:text-foreground transition-colors"
+                        title={`User ID: ${authorId}`}
+                      >
+                        id: {authorId.length > 10 ? `${authorId.slice(0, 8)}...` : authorId}
+                      </span>
+                      <span>•</span>
+                    </>
+                  ) : null}
                   <span>Now</span>
                   <span>•</span>
                   <span>Edited</span>
@@ -291,9 +330,16 @@ export function LinkedInPreview() {
       </div>
 
       <ProfileCustomizerDialog
+        key={showProfileCustomizer ? `${authorName}-${authorHeadline}-${authorAvatar}` : 'closed'}
         open={showProfileCustomizer}
         onOpenChange={setShowProfileCustomizer}
-        profile={userProfile}
+        profile={{
+          ...userProfile,
+          name: authorName,
+          headline: authorHeadline,
+          avatarUrl: authorAvatar,
+          id: authorId,
+        }}
         onSave={(updated) => updateUserProfile(updated)}
       />
     </div>
