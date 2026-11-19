@@ -7,6 +7,7 @@ import type {
   AdminAuditAction,
 } from '../types/admin.types'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
+import { adminAuthService } from './admin-auth.service'
 
 const ADMIN_USERS_STORAGE_KEY = 'draftin_admin_users_v1'
 const ADMIN_AUDIT_STORAGE_KEY = 'draftin_admin_audit_logs_v1'
@@ -184,6 +185,26 @@ export const adminService = {
     return null
   },
 
+  getActiveAdminUser(): AdminUser | null {
+    if (typeof localStorage === 'undefined' && typeof sessionStorage === 'undefined') return null
+    if (!adminAuthService.isAuthenticated()) return null
+    const session = adminAuthService.getAdminSession()
+    const username = session?.username || 'admin'
+    return {
+      id: 'usr-admin-session',
+      name: `${username.charAt(0).toUpperCase() + username.slice(1)} (Administrator)`,
+      email: `${username.toLowerCase()}@draftin.io`,
+      headline: 'Platform Administrator • Superadmin',
+      avatarUrl: '',
+      role: 'admin',
+      status: 'active',
+      draftsCount: 0,
+      publishedCount: 0,
+      createdAt: session?.authenticatedAt || new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+    }
+  },
+
   getUsers(): AdminUser[] {
     try {
       const stored = localStorage.getItem(ADMIN_USERS_STORAGE_KEY)
@@ -204,14 +225,22 @@ export const adminService = {
                 u.id === activeUser.id || (activeUser.email && u.email === activeUser.email)
             )
           ) {
-            const merged = [activeUser, ...cleaned]
-            this.saveUsers(merged)
-            return merged
+            cleaned.unshift(activeUser)
           }
 
-          if (!isTestEnv && cleaned.length !== parsed.length) {
-            this.saveUsers(cleaned)
+          // Auto-sync active administrator session
+          const activeAdmin = this.getActiveAdminUser()
+          if (
+            activeAdmin &&
+            !cleaned.some(
+              (u: AdminUser) =>
+                u.id === activeAdmin.id || (activeAdmin.email && u.email === activeAdmin.email)
+            )
+          ) {
+            cleaned.push(activeAdmin)
           }
+
+          this.saveUsers(cleaned)
 
           if (cleaned.length > 0 || !isTestEnv) {
             return cleaned
@@ -238,11 +267,18 @@ export const adminService = {
       return initial
     }
 
-    // In normal runtime / production, ONLY return real active users
-    const activeUser = this.getRegisteredGoogleUser()
-    const realUsers: AdminUser[] = activeUser ? [activeUser] : []
-    this.saveUsers(realUsers)
-    return realUsers
+    // In normal runtime / production, return real active users (active creator and/or active admin)
+    const activeUsers: AdminUser[] = []
+    const googleUser = this.getRegisteredGoogleUser()
+    if (googleUser) activeUsers.push(googleUser)
+
+    const adminUser = this.getActiveAdminUser()
+    if (adminUser && !activeUsers.some((u) => u.id === adminUser.id || u.email === adminUser.email)) {
+      activeUsers.push(adminUser)
+    }
+
+    this.saveUsers(activeUsers)
+    return activeUsers
   },
 
   saveUsers(users: AdminUser[]): void {
