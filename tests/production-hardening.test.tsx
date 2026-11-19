@@ -10,7 +10,8 @@ import { entitlementsService } from '@/features/billing/services/entitlements.se
 import { checkSystemHealth } from '@/lib/health'
 import { logger } from '@/lib/logger'
 import { adminAuthService } from '@/features/admin/services/admin-auth.service'
-import { adminService } from '@/features/admin/services/admin.service'
+import { adminService, isDummyUser } from '@/features/admin/services/admin.service'
+import type { AdminUser } from '@/features/admin/types/admin.types'
 import { AdminLoginPage } from '@/features/admin/components/AdminLoginPage'
 import { LinkedInPreview } from '@/features/preview/components/LinkedInPreview'
 import { DraftStoreProvider } from '@/stores/draft.store'
@@ -317,6 +318,14 @@ describe('Phase 08-14: Production Hardening, Security & Reliability', () => {
       const found = users.find((u) => u.id === 'usr-google-999' || u.email === 'sundar@google.com')
       expect(found).toBeDefined()
       expect(found?.name).toBe('Sundar Pichai')
+    })
+
+    it('isDummyUser correctly identifies dummy accounts to keep production clean of mock users', () => {
+      expect(isDummyUser({ id: 'usr-1', email: 'alex.morgan@draftin.io' } as AdminUser)).toBe(true)
+      expect(isDummyUser({ id: 'usr-2', email: 'sarah.connor@ai-scale.com' } as AdminUser)).toBe(true)
+      expect(isDummyUser({ id: 'usr-3', email: 'marcus.vance@growthpulse.co' } as AdminUser)).toBe(true)
+      expect(isDummyUser({ id: 'usr-4', email: 'elena.rostova@fintech-weekly.org' } as AdminUser)).toBe(true)
+      expect(isDummyUser({ id: 'real-user-123', email: 'creator@gmail.com' } as AdminUser)).toBe(false)
     })
   })
 
