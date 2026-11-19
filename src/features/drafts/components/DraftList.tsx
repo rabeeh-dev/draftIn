@@ -117,7 +117,7 @@ export function DraftList() {
       <DraftSearch />
 
       {/* Scrollable Drafts List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {isLoading ? (
           <DraftListSkeleton count={4} />
         ) : filteredDrafts.length > 0 ? (

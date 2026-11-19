@@ -19,7 +19,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       <section
         className={`h-full border-r border-border transition-all duration-300 ease-in-out shrink-0 ${
           isDraftListOpen
-            ? 'w-full md:w-80 lg:w-88 flex'
+            ? 'w-full md:w-68 lg:w-76 flex'
             : 'hidden'
         } ${
           // On mobile, if draft list is open, it takes full width over the editor

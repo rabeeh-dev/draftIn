@@ -4,6 +4,7 @@ import { DraftStoreProvider, useDraftStore } from '@/stores/draft.store'
 import { AuthProvider } from '@/features/auth/context/AuthContext'
 import { EditorHeader } from '@/features/editor/components/EditorHeader'
 import { DraftList } from '@/features/drafts/components/DraftList'
+import { DraftCard } from '@/features/drafts/components/DraftCard'
 import { draftService, mapRowToDraft, mapDraftToRow } from '@/features/drafts/services/draft.service'
 import { TEST_FIXTURE_DRAFTS } from './test-fixtures'
 import type { Draft } from '@/types'
@@ -271,6 +272,33 @@ describe('Phase 5: Draft Management Engine', () => {
       renderWithProviders(<EmptyTester />)
       expect(screen.getByTestId('draft-count').textContent).toBe('0')
       expect(screen.getByTestId('active-draft').textContent).toBe('none')
+    })
+  })
+
+  describe('DraftCard Content Rendering & Compact Column', () => {
+    it('strips raw HTML tags from content snippet and displays clean plain text', () => {
+      const htmlDraft: Draft = {
+        id: 'draft-html-preview',
+        title: 'HTML Post Preview',
+        content: '<p>This is a <strong>clean snippet</strong> without <em>any</em> HTML tags.</p>',
+        status: 'draft',
+        isStarred: false,
+        tags: ['Clean'],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      renderWithProviders(
+        <DraftCard
+          draft={htmlDraft}
+          isSelected={false}
+          onSelect={() => {}}
+        />
+      )
+
+      expect(screen.getByText('This is a clean snippet without any HTML tags.')).toBeInTheDocument()
+      expect(screen.queryByText(/<p>/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/<strong>/i)).not.toBeInTheDocument()
     })
   })
 })

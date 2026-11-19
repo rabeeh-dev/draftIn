@@ -32,12 +32,27 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function stripHtmlToPlainText(content?: string | null): string {
+  if (!content) return ''
+  return content
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function DraftCard({ draft, isSelected, onSelect }: DraftCardProps) {
   const { toggleStar, deleteDraft, duplicateDraft } = useDraftStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const charCount = draft.content.length
-  const wordCount = draft.content.trim() ? draft.content.trim().split(/\s+/).length : 0
+  const plainText = stripHtmlToPlainText(draft.content)
+  const charCount = plainText.length
+  const wordCount = plainText ? plainText.split(/\s+/).filter(Boolean).length : 0
 
   const statusConfig = {
     draft: {
@@ -71,23 +86,23 @@ export function DraftCard({ draft, isSelected, onSelect }: DraftCardProps) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') onSelect()
         }}
-        className={`group relative flex flex-col gap-2 rounded-xl p-3.5 transition-all text-left outline-none cursor-pointer border ${
+        className={`group relative flex flex-col gap-1.5 rounded-xl p-2.5 transition-all text-left outline-none cursor-pointer border ${
           isSelected
             ? 'bg-card border-primary/40 shadow-xs ring-1 ring-primary/20'
             : 'bg-card/50 border-border/70 hover:bg-card hover:border-border hover:shadow-2xs'
         }`}
       >
         {/* Card Header: Title + Star + Actions */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-1.5">
           <h4
-            className={`text-xs font-semibold leading-snug truncate flex-1 ${
+            className={`text-xs font-semibold leading-tight truncate flex-1 ${
               isSelected ? 'text-foreground' : 'text-foreground/90'
             }`}
           >
             {draft.title || 'Untitled Draft'}
           </h4>
 
-          <div className="flex items-center gap-1 shrink-0 -mr-1" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-0.5 shrink-0 -mr-1" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => toggleStar(draft.id)}
               className="p-1 rounded-md text-muted-foreground/60 hover:text-amber-500 transition-colors"
@@ -128,18 +143,18 @@ export function DraftCard({ draft, isSelected, onSelect }: DraftCardProps) {
           </div>
         </div>
 
-        {/* Content Preview */}
-        <p className="line-clamp-2 text-[11px] text-muted-foreground leading-relaxed">
-          {draft.content || 'No content yet. Click to start drafting...'}
+        {/* Content Preview (Clean plain text, no raw HTML tags) */}
+        <p className="line-clamp-1 text-[11px] text-muted-foreground leading-snug">
+          {plainText || 'No content yet. Click to start drafting...'}
         </p>
 
         {/* Tags */}
         {draft.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-0.5">
-            {draft.tags.map((tag) => (
+          <div className="flex flex-wrap gap-1">
+            {draft.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] px-1.5 py-0.5 rounded-md bg-muted/60 text-muted-foreground font-medium"
+                className="text-[9px] px-1.5 py-0.2 rounded bg-muted/70 text-muted-foreground font-medium"
               >
                 #{tag}
               </span>
@@ -147,17 +162,17 @@ export function DraftCard({ draft, isSelected, onSelect }: DraftCardProps) {
           </div>
         )}
 
-        {/* Footer: Status badge & timestamp / stats */}
-        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[10px] text-muted-foreground">
+        {/* Footer: Compact status badge & timestamp / stats */}
+        <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
           <Badge
             variant={statusConfig.variant}
-            className={`text-[10px] h-4.5 px-1.5 font-medium gap-1 ${statusConfig.className}`}
+            className={`text-[9px] h-4 px-1.5 font-medium gap-1 ${statusConfig.className}`}
           >
             {StatusIcon && <StatusIcon className="size-2.5" />}
             {statusConfig.label}
           </Badge>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
             <span>{wordCount} words</span>
             <span>•</span>
             <span>{charCount} chars</span>
