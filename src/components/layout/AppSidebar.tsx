@@ -12,7 +12,6 @@ import {
   Star,
   Clock,
   CheckCircle2,
-  Trash2,
   Settings,
   Plus,
   Sparkles,
@@ -195,47 +194,62 @@ export function AppSidebar() {
               </span>
             )}
             <button
-              onClick={() => {}}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
+              type="button"
+              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground transition-colors cursor-default ${
                 !isSidebarOpen ? 'justify-center px-0' : ''
               }`}
-              title={!isSidebarOpen ? 'Viral Hooks Library' : undefined}
+              title={!isSidebarOpen ? 'Viral Hooks (Coming Soon)' : undefined}
             >
-              <Sparkles className="size-4 shrink-0 text-amber-500" />
+              <Sparkles className="size-4 shrink-0 text-amber-500/80" />
               {isSidebarOpen && (
                 <>
                   <span className="flex-1 text-left truncate">Viral Hooks</span>
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/30 text-amber-600 dark:text-amber-400">
-                    Pro
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-normal text-muted-foreground bg-muted">
+                    Coming Soon
                   </Badge>
                 </>
               )}
             </button>
 
             <button
-              onClick={() => {}}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-                !isSidebarOpen ? 'Templates' : ''
+              type="button"
+              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground transition-colors cursor-default ${
+                !isSidebarOpen ? 'justify-center px-0' : ''
               }`}
-              title={!isSidebarOpen ? 'Templates' : undefined}
+              title={!isSidebarOpen ? 'Templates (Coming Soon)' : undefined}
             >
-              <Bookmark className="size-4 shrink-0" />
-              {isSidebarOpen && <span className="flex-1 text-left truncate">Templates</span>}
+              <Bookmark className="size-4 shrink-0 text-muted-foreground/80" />
+              {isSidebarOpen && (
+                <>
+                  <span className="flex-1 text-left truncate">Templates</span>
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-normal text-muted-foreground bg-muted">
+                    Coming Soon
+                  </Badge>
+                </>
+              )}
             </button>
 
             <button
-              onClick={() => {}}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-                !isSidebarOpen ? 'Analytics' : ''
+              type="button"
+              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground transition-colors cursor-default ${
+                !isSidebarOpen ? 'justify-center px-0' : ''
               }`}
-              title={!isSidebarOpen ? 'Analytics' : undefined}
+              title={!isSidebarOpen ? 'Analytics (Coming Soon)' : undefined}
             >
-              <BarChart3 className="size-4 shrink-0" />
-              {isSidebarOpen && <span className="flex-1 text-left truncate">Analytics</span>}
+              <BarChart3 className="size-4 shrink-0 text-muted-foreground/80" />
+              {isSidebarOpen && (
+                <>
+                  <span className="flex-1 text-left truncate">Analytics</span>
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 font-normal text-muted-foreground bg-muted">
+                    Coming Soon
+                  </Badge>
+                </>
+              )}
             </button>
 
             {(!isAuthenticated || isAdmin) && (
               <button
+                type="button"
                 onClick={() => {
                   setCurrentView('admin')
                   navigate('/admin')
@@ -264,6 +278,7 @@ export function AppSidebar() {
         {/* Bottom User Profile Section */}
         <div className="p-2 space-y-1">
           <button
+            type="button"
             onClick={() => navigate('/app/settings')}
             className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
               !isSidebarOpen ? 'justify-center px-0' : ''
@@ -272,17 +287,6 @@ export function AppSidebar() {
           >
             <Settings className="size-4 shrink-0" />
             {isSidebarOpen && <span className="flex-1 text-left">Settings</span>}
-          </button>
-
-          <button
-            onClick={() => {}}
-            className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground transition-colors ${
-              !isSidebarOpen ? 'Trash' : ''
-            }`}
-            title="Trash"
-          >
-            <Trash2 className="size-4 shrink-0" />
-            {isSidebarOpen && <span className="flex-1 text-left">Trash</span>}
           </button>
 
           {isAuthenticated ? (

@@ -6,7 +6,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -20,10 +19,8 @@ import {
   Link2,
   Undo2,
   Redo2,
-  Sparkles,
   Smile,
   Hash,
-  Lightbulb,
   RemoveFormatting,
 } from 'lucide-react'
 
@@ -54,29 +51,6 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   const handleLinkRemove = () => {
     editor.chain().focus().unsetLink().run()
   }
-
-  const hookTemplates = [
-    {
-      label: 'The Painful Truth',
-      text: 'Most people think [common belief] is the key to success.\n\nThey’re wrong.\n\nHere’s what 5 years in [field] taught me:',
-    },
-    {
-      label: 'The 1% Rule',
-      text: 'Here is what separates top 1% engineers from the rest:\n\n1. \n2. \n3. ',
-    },
-    {
-      label: 'Stop Doing X',
-      text: 'Stop doing [common mistake] in 2026.\n\nDo this instead:',
-    },
-    {
-      label: 'Step-by-Step Breakdown',
-      text: 'How I achieved [result] in 6 months:\n\n(A step-by-step breakdown you can copy):',
-    },
-    {
-      label: 'Curated Resource List',
-      text: '5 tools that save me 10+ hours every week:\n\n1. \n2. \n3. \n4. \n5. ',
-    },
-  ]
 
   const emojiPicks = ['🔥', '💡', '🚀', '👇', '🎯', '✨', '📈', '✅']
   const popularHashtags = [
@@ -289,46 +263,6 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
                   className="text-xs cursor-pointer"
                 >
                   {tag}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Right Area: Viral Hook Templates */}
-        <div className="flex items-center gap-2 shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold transition-colors shadow-2xs outline-none"
-              title="Viral Hook Templates"
-            >
-              <Sparkles className="size-3.5 text-primary" />
-              <span className="text-[11px]">Hooks</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel className="flex items-center gap-1.5 text-xs text-foreground font-semibold">
-                <Lightbulb className="size-3.5 text-amber-500" />
-                <span>Proven LinkedIn Hooks</span>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {hookTemplates.map((template) => (
-                <DropdownMenuItem
-                  key={template.label}
-                  onClick={() =>
-                    editor
-                      .chain()
-                      .focus()
-                      .insertContent(`\n${template.text}\n`)
-                      .run()
-                  }
-                  className="flex flex-col items-start gap-1 p-2 cursor-pointer"
-                >
-                  <span className="font-semibold text-xs text-foreground">
-                    {template.label}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground line-clamp-1">
-                    {template.text.replace(/\n/g, ' ')}
-                  </span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
