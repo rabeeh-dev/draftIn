@@ -11,6 +11,7 @@ import {
   toUnicodeStrike,
 } from '@/features/preview/utils/publishingText'
 import { copyTextToClipboard } from '@/features/preview/utils/clipboard'
+import { TEST_FIXTURE_DRAFTS } from './test-fixtures'
 
 function renderWithProviders(ui: React.ReactNode) {
   return render(
@@ -26,6 +27,7 @@ describe('Phase 6: Publishing Handoff Engine', () => {
 
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem('draftin_drafts_v1', JSON.stringify(TEST_FIXTURE_DRAFTS))
     clipboardWriteTextMock = vi.fn().mockResolvedValue(undefined)
     Object.assign(navigator, {
       clipboard: {

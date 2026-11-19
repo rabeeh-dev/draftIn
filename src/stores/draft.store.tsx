@@ -19,50 +19,6 @@ const INITIAL_PROFILE: UserProfile = {
   username: 'alexmorgan',
 }
 
-const INITIAL_DRAFTS: Draft[] = [
-  {
-    id: 'draft-1',
-    title: 'The 1% Rule of Software Engineering',
-    content: `Most engineers think seniority is about knowing every framework.\n\nIt’s not.\n\nHere’s what actually separates top 1% engineers from the rest:\n\n1. They delete more code than they write.\n2. They optimize for maintainability, not cleverness.\n3. They understand the business problem before opening the IDE.\n4. They communicate trade-offs with radical clarity.\n\nCode is a liability. Features are assets.\n\nWhat’s the most valuable lesson you learned this year?\n\n#SoftwareEngineering #WebDevelopment #TechCareers #Programming`,
-    status: 'draft',
-    isStarred: true,
-    tags: ['Engineering', 'Career'],
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    updatedAt: new Date(Date.now() - 60000 * 15).toISOString(),
-  },
-  {
-    id: 'draft-2',
-    title: 'Why we transitioned to React 19 & Tailwind v4',
-    content: `We just shipped our migration to React 19 and Tailwind CSS v4 in production.\n\n3 unexpected benefits we noticed immediately:\n\n→ 40% reduction in styling bundle size with native CSS variables\n→ Zero re-render waterfalls with Base UI primitives\n→ Lightning-fast dev builds with Vite 8\n\nModern web tooling has reached an incredible level of maturity.\n\nAre you planning to upgrade this quarter?\n\n#React #TailwindCSS #WebDev #Frontend`,
-    status: 'scheduled',
-    isStarred: false,
-    tags: ['Tech', 'React'],
-    scheduledFor: 'Tomorrow, 9:00 AM',
-    createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-  {
-    id: 'draft-3',
-    title: '5 non-obvious lessons from building an AI-first editor',
-    content: `Building software in 2026 feels completely different.\n\nHere are 5 non-obvious truths about building AI features that users actually stick with:\n\n1. Speed beats perfection. A 200ms heuristic beats a 3-second LLM call.\n2. Invisible AI is better than chat bubbles everywhere.\n3. Context is king — knowing what the user just typed matters more than prompt size.\n4. Guardrails prevent embarrassment.\n5. Let users always have the final keyboard shortcut.\n\nWhat’s your take on embedded AI interfaces?\n\n#ProductDesign #AI #UX #BuildInPublic`,
-    status: 'published',
-    isStarred: true,
-    tags: ['AI', 'Design'],
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-  },
-  {
-    id: 'draft-4',
-    title: 'How to write LinkedIn hooks that convert without being cringe',
-    content: `Stop starting your posts with "I'm humbled and excited to announce..."\n\nNobody cares about announcements. People care about solutions.\n\nUse this 3-part framework instead:\n\n• The Hook: Point out a painful truth or counter-intuitive insight.\n• The Story: 3 concise bullet points of how you fixed it.\n• The Takeaway: 1 single actionable sentence.\n\nKeep it honest. Keep it punchy.\n\n#ContentStrategy #LinkedInGrowth #CreatorEconomy`,
-    status: 'draft',
-    isStarred: false,
-    tags: ['Marketing', 'Writing'],
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-]
-
 interface DraftStoreContextType {
   drafts: Draft[]
   activeDraft: Draft | null
@@ -112,10 +68,12 @@ const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [drafts, setDrafts] = useState<Draft[]>(() => {
-    const local = draftService.getLocalDrafts()
-    return local.length > 0 ? local : INITIAL_DRAFTS
+    return draftService.getLocalDrafts()
   })
-  const [activeDraftId, setActiveDraftId] = useState<string | null>('draft-1')
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(() => {
+    const local = draftService.getLocalDrafts()
+    return local.length > 0 ? local[0].id : null
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [filter, setFilter] = useState<DraftFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('updated_desc')
@@ -147,11 +105,11 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     setIsLoading(true)
     try {
       const { data, error } = await draftService.fetchDrafts(user.id)
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setDrafts(data)
         setActiveDraftId((currentId) => {
           if (!currentId || !data.some((d) => d.id === currentId)) {
-            return data[0].id
+            return data.length > 0 ? data[0].id : null
           }
           return currentId
         })
@@ -166,11 +124,11 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     let isCancelled = false
 
     draftService.fetchDrafts(user.id).then(({ data, error }) => {
-      if (isCancelled || error || !data || data.length === 0) return
+      if (isCancelled || error || !data) return
       setDrafts(data)
       setActiveDraftId((currentId) => {
         if (!currentId || !data.some((d) => d.id === currentId)) {
-          return data[0].id
+          return data.length > 0 ? data[0].id : null
         }
         return currentId
       })
@@ -327,9 +285,13 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const duplicateDraft = (id: string) => {
     const target = drafts.find((d) => d.id === id)
     if (!target) return
+    const duplicateId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `draft-${Date.now()}`
     const duplicated: Draft = {
       ...target,
-      id: `draft-${Date.now()}`,
+      id: duplicateId,
       title: `${target.title} (Copy)`,
       status: 'draft',
       createdAt: new Date().toISOString(),

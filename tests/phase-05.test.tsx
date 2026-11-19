@@ -5,6 +5,7 @@ import { AuthProvider } from '@/features/auth/context/AuthContext'
 import { EditorHeader } from '@/features/editor/components/EditorHeader'
 import { DraftList } from '@/features/drafts/components/DraftList'
 import { draftService, mapRowToDraft, mapDraftToRow } from '@/features/drafts/services/draft.service'
+import { TEST_FIXTURE_DRAFTS } from './test-fixtures'
 import type { Draft } from '@/types'
 
 function renderWithProviders(ui: React.ReactNode) {
@@ -18,6 +19,7 @@ function renderWithProviders(ui: React.ReactNode) {
 describe('Phase 5: Draft Management Engine', () => {
   beforeEach(() => {
     localStorage.clear()
+    localStorage.setItem('draftin_drafts_v1', JSON.stringify(TEST_FIXTURE_DRAFTS))
   })
 
   describe('Data Mapping & Local Persistence', () => {
@@ -252,6 +254,23 @@ describe('Phase 5: Draft Management Engine', () => {
       await waitFor(() => {
         expect(screen.getByTestId('error-status').textContent).toBe('saved')
       })
+    })
+
+    it('initializes with an empty draft list when localStorage has no drafts (zero dummy contents)', () => {
+      localStorage.clear()
+      function EmptyTester() {
+        const { drafts, activeDraft } = useDraftStore()
+        return (
+          <div>
+            <span data-testid="draft-count">{drafts.length}</span>
+            <span data-testid="active-draft">{activeDraft ? 'exists' : 'none'}</span>
+          </div>
+        )
+      }
+
+      renderWithProviders(<EmptyTester />)
+      expect(screen.getByTestId('draft-count').textContent).toBe('0')
+      expect(screen.getByTestId('active-draft').textContent).toBe('none')
     })
   })
 })
