@@ -38,6 +38,20 @@ export function mapRowToDraft(row: DraftRow): Draft {
   }
 }
 
+export function sanitizeScheduledTimestamp(value?: string | null): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString()
+  }
+  if (value.toLowerCase().includes('tomorrow')) {
+    const tomorrow = new Date(Date.now() + 86400000)
+    tomorrow.setHours(9, 0, 0, 0)
+    return tomorrow.toISOString()
+  }
+  return null
+}
+
 // Transform Frontend Draft Model to Supabase DB Insert/Update
 export function mapDraftToRow(draft: Draft, userId: string): DraftInsert {
   return {
@@ -48,7 +62,7 @@ export function mapDraftToRow(draft: Draft, userId: string): DraftInsert {
     status: draft.status,
     is_starred: draft.isStarred,
     tags: draft.tags,
-    scheduled_for: draft.scheduledFor ?? null,
+    scheduled_for: sanitizeScheduledTimestamp(draft.scheduledFor),
     updated_at: draft.updatedAt,
   }
 }
@@ -140,7 +154,7 @@ export const draftService = {
           status: draft.status,
           is_starred: draft.isStarred,
           tags: draft.tags,
-          scheduled_for: draft.scheduledFor ?? null,
+          scheduled_for: sanitizeScheduledTimestamp(draft.scheduledFor),
         })
         .select()
         .single()
@@ -206,7 +220,7 @@ export const draftService = {
       if (updates.status !== undefined) updatePayload.status = updates.status
       if (updates.isStarred !== undefined) updatePayload.is_starred = updates.isStarred
       if (updates.tags !== undefined) updatePayload.tags = updates.tags
-      if (updates.scheduledFor !== undefined) updatePayload.scheduled_for = updates.scheduledFor
+      if (updates.scheduledFor !== undefined) updatePayload.scheduled_for = sanitizeScheduledTimestamp(updates.scheduledFor)
 
       const { error } = await supabase
         .from('drafts')

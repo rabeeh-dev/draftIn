@@ -75,6 +75,17 @@ interface DraftStoreContextType {
 
 const DraftStoreContext = createContext<DraftStoreContextType | null>(null)
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const isTestEnv =
@@ -263,6 +274,16 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
             .single()
             .then(({ data: profileData, error: profileError }) => {
               if (isCancelled || profileError || !profileData) return
+
+              if (profileData.preferences && typeof profileData.preferences === 'object') {
+                const prefs = profileData.preferences as {
+                  editorLayout?: 'split' | 'editor-only' | 'preview-only'
+                  previewDevice?: 'mobile' | 'desktop'
+                }
+                if (prefs.editorLayout) setEditorLayout(prefs.editorLayout)
+                if (prefs.previewDevice) setPreviewDevice(prefs.previewDevice)
+              }
+
               setUserProfile((prev) => {
                 const merged: UserProfile = {
                   id: currentUserId,
@@ -388,10 +409,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   }, [retrySync])
 
   const createDraft = () => {
-    const newId =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `draft-${Date.now()}`
+    const newId = generateUUID()
     const newDraft: Draft = {
       id: newId,
       title: 'Untitled Draft',
@@ -459,10 +477,7 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
   const duplicateDraft = (id: string) => {
     const target = drafts.find((d) => d.id === id)
     if (!target) return
-    const duplicateId =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `draft-${Date.now()}`
+    const duplicateId = generateUUID()
     const duplicated: Draft = {
       ...target,
       id: duplicateId,
@@ -477,6 +492,13 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
       return next
     })
     setActiveDraftId(duplicated.id)
+
+    // Sync duplicated draft to Supabase if authenticated
+    if (user?.id) {
+      draftService.createDraft(duplicated, user.id).catch((err) => {
+        console.error('Failed to create duplicated draft in cloud:', err)
+      })
+    }
   }
 
   const toggleStar = (id: string) => {
@@ -502,6 +524,40 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev)
   const toggleDraftList = () => setIsDraftListOpen((prev) => !prev)
+
+  const setPreviewDeviceWithSync = (device: 'mobile' | 'desktop') => {
+    setPreviewDevice(device)
+    if (user?.id && isSupabaseConfigured) {
+      supabase
+        .from('profiles')
+        .update({
+          preferences: { editorLayout, previewDevice: device },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+        .then(
+          () => {},
+          (err) => console.error('Failed to sync previewDevice to Supabase:', err)
+        )
+    }
+  }
+
+  const setEditorLayoutWithSync = (layout: 'split' | 'editor-only' | 'preview-only') => {
+    setEditorLayout(layout)
+    if (user?.id && isSupabaseConfigured) {
+      supabase
+        .from('profiles')
+        .update({
+          preferences: { editorLayout: layout, previewDevice },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+        .then(
+          () => {},
+          (err) => console.error('Failed to sync editorLayout to Supabase:', err)
+        )
+    }
+  }
 
   const value = {
     drafts,
@@ -536,8 +592,8 @@ export function DraftStoreProvider({ children }: { children: ReactNode }) {
     setSearchQuery,
     setFilter,
     setSortBy,
-    setPreviewDevice,
-    setEditorLayout,
+    setPreviewDevice: setPreviewDeviceWithSync,
+    setEditorLayout: setEditorLayoutWithSync,
     toggleSidebar,
     setIsSidebarOpen,
     toggleDraftList,
