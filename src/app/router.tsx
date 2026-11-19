@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { LoadingState } from '@/components/shared/LoadingState'
 import { Button } from '@/components/ui/button'
-import { ShieldAlert, ArrowLeft } from 'lucide-react'
+import { ShieldAlert, ArrowLeft, LogOut } from 'lucide-react'
 
 interface RouterContextType {
   path: string
@@ -122,7 +122,7 @@ export function Link({
  * Protects user application routes (/app/*).
  */
 export function AuthGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isSuspended, isLoading, user, signOut } = useAuth()
   const { path, navigate } = useRouter()
 
   useEffect(() => {
@@ -146,6 +146,30 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     return null
   }
 
+  if (isSuspended) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center p-6 bg-background text-foreground">
+        <div className="w-full max-w-md p-6 rounded-2xl border border-destructive/20 bg-card shadow-sm space-y-4 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+            <ShieldAlert className="size-6" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-foreground">Account Suspended</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your account (<span className="font-semibold text-foreground">{user?.email}</span>) has been suspended by an administrator. You cannot create, edit, or view private drafts.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Button onClick={() => signOut()} variant="outline" className="gap-2 text-xs w-full">
+              <LogOut className="size-3.5" />
+              <span>Sign Out</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return <>{children}</>
 }
 
@@ -154,7 +178,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
  * Protects admin application routes (/admin/*).
  */
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isAdmin, isLoading, user } = useAuth()
+  const { isAuthenticated, isAdmin, isSuspended, isLoading, user, signOut } = useAuth()
   const { path, navigate } = useRouter()
 
   useEffect(() => {
@@ -176,6 +200,30 @@ export function AdminGuard({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated) {
     return null
+  }
+
+  if (isSuspended) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center p-6 bg-background text-foreground">
+        <div className="w-full max-w-md p-6 rounded-2xl border border-destructive/20 bg-card shadow-sm space-y-4 text-center">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+            <ShieldAlert className="size-6" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-foreground">Account Suspended</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Your administrative access has been revoked due to account suspension.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Button onClick={() => signOut()} variant="outline" className="gap-2 text-xs w-full">
+              <LogOut className="size-3.5" />
+              <span>Sign Out</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!isAdmin) {

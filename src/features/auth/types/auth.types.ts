@@ -9,6 +9,8 @@ export interface AuthContextType {
   isAuthenticated: boolean
   isAdmin: boolean
   role: 'admin' | 'user'
+  status: 'active' | 'suspended'
+  isSuspended: boolean
   error: AuthError | null
   signInWithEmail: (email: string, password: string) => Promise<{ error: AuthError | null }>
   signUpWithEmail: (

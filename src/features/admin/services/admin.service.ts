@@ -69,13 +69,14 @@ export const adminService = {
     }
   },
 
-  updateUserRole(userId: string, newRole: UserRole, adminEmail = 'admin@draftin.io'): AdminUser[] {
+  updateUserRole(userId: string, newRole: UserRole, adminEmail = 'admin@draftin.io', adminId?: string): AdminUser[] {
     const current = this.getUsers()
     const targetUser = current.find((u) => u.id === userId)
     const updated = current.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
     this.saveUsers(updated)
 
     this.logAction({
+      adminId,
       adminEmail,
       targetUserId: userId,
       targetUserName: targetUser?.name || userId,
@@ -97,13 +98,14 @@ export const adminService = {
     return updated
   },
 
-  updateUserStatus(userId: string, newStatus: UserStatus, adminEmail = 'admin@draftin.io'): AdminUser[] {
+  updateUserStatus(userId: string, newStatus: UserStatus, adminEmail = 'admin@draftin.io', adminId?: string): AdminUser[] {
     const current = this.getUsers()
     const targetUser = current.find((u) => u.id === userId)
     const updated = current.map((u) => (u.id === userId ? { ...u, status: newStatus } : u))
     this.saveUsers(updated)
 
     this.logAction({
+      adminId,
       adminEmail,
       targetUserId: userId,
       targetUserName: targetUser?.name || userId,
@@ -125,13 +127,14 @@ export const adminService = {
     return updated
   },
 
-  deleteUser(userId: string, adminEmail = 'admin@draftin.io'): AdminUser[] {
+  deleteUser(userId: string, adminEmail = 'admin@draftin.io', adminId?: string): AdminUser[] {
     const current = this.getUsers()
     const targetUser = current.find((u) => u.id === userId)
     const updated = current.filter((u) => u.id !== userId)
     this.saveUsers(updated)
 
     this.logAction({
+      adminId,
       adminEmail,
       targetUserId: userId,
       targetUserName: targetUser?.name || userId,
@@ -284,6 +287,7 @@ export const adminService = {
       supabase
         .from('admin_audit_logs')
         .insert({
+          admin_id: newLog.adminId || null,
           admin_email: newLog.adminEmail || null,
           target_user_id: newLog.targetUserId || null,
           target_user_name: newLog.targetUserName || null,

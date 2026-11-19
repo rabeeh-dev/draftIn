@@ -3,7 +3,9 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useDraftStore } from '@/stores/draft.store'
 import { useRouter } from '@/app/router'
 import { draftService } from '@/features/drafts/services/draft.service'
+import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import {
   ArrowLeft,
   Trash2,
@@ -13,19 +15,80 @@ import {
   HardDrive,
   Laptop,
   Smartphone,
+  Download,
+  UserX,
 } from 'lucide-react'
 
 export function UserSettingsPage() {
   const { user, signOut } = useAuth()
-  const { previewDevice, setPreviewDevice, editorLayout, setEditorLayout } = useDraftStore()
+  const { drafts, userProfile, previewDevice, setPreviewDevice, editorLayout, setEditorLayout } =
+    useDraftStore()
   const { navigate } = useRouter()
   const [clearedMessage, setClearedMessage] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleClearCache = () => {
     if (user?.id) {
       draftService.clearUserDrafts(user.id)
       setClearedMessage(true)
       setTimeout(() => setClearedMessage(false), 3000)
+    }
+  }
+
+  const handleExportData = () => {
+    setIsExporting(true)
+    try {
+      const exportPayload = {
+        exportDate: new Date().toISOString(),
+        profile: userProfile,
+        draftsCount: drafts.length,
+        drafts: drafts.map((d) => ({
+          id: d.id,
+          title: d.title,
+          content: d.content,
+          status: d.status,
+          tags: d.tags,
+          isStarred: d.isStarred,
+          createdAt: d.createdAt,
+          updatedAt: d.updatedAt,
+        })),
+      }
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `draftin-export-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user?.id) return
+    setIsDeleting(true)
+
+    try {
+      if (isSupabaseConfigured) {
+        // Delete profile which cascades drafts
+        await supabase.from('profiles').delete().eq('id', user.id)
+      }
+      draftService.clearUserDrafts(user.id)
+      await signOut()
+      navigate('/login', { replace: true })
+    } catch (err) {
+      console.error('Account deletion failed:', err)
+    } finally {
+      setIsDeleting(false)
+      setIsDeleteDialogOpen(false)
     }
   }
 
@@ -133,7 +196,8 @@ export function UserSettingsPage() {
                 </span>
               </div>
               <p className="text-[10px] text-muted-foreground">
-                Your offline drafts are strictly isolated to this account and never shared across sign-ins.
+                Your offline drafts are strictly isolated to this account and never shared across
+                sign-ins.
               </p>
             </div>
 
@@ -157,6 +221,69 @@ export function UserSettingsPage() {
           </div>
         </div>
 
+        {/* Data Privacy & GDPR Personal Export */}
+        <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Download className="size-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Data Privacy & Export</h2>
+              <p className="text-[11px] text-muted-foreground">
+                Download your complete writing history (GDPR / CCPA)
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Export all your personal profile details, settings, and saved drafts in a standardized
+            JSON format for your personal backups.
+          </p>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportData}
+            disabled={isExporting}
+            className="w-full gap-2 text-xs"
+          >
+            <Download className="size-3.5" />
+            <span>{isExporting ? 'Preparing Export...' : `Export All Data (${drafts.length} drafts)`}</span>
+          </Button>
+        </div>
+
+        {/* Danger Zone: Account Deletion */}
+        <div className="rounded-2xl border border-destructive/20 bg-card p-6 shadow-2xs space-y-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <UserX className="size-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-destructive">Danger Zone</h2>
+              <p className="text-[11px] text-muted-foreground">
+                Irreversible account deletion
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Permanently delete your creator account, cloud profile, and all associated drafts. This
+            action cannot be undone.
+          </p>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            className="w-full gap-2 text-xs"
+          >
+            <UserX className="size-3.5" />
+            <span>Delete Account & Erase All Data</span>
+          </Button>
+        </div>
+
         {/* Cloud Authentication & Session */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-2xs space-y-4 md:col-span-2">
           <div className="flex items-center justify-between">
@@ -166,7 +293,9 @@ export function UserSettingsPage() {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-foreground">Authentication & Session</h2>
-                <p className="text-[11px] text-muted-foreground">Active Supabase session management</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Active Supabase session management
+                </p>
               </div>
             </div>
 
@@ -185,11 +314,15 @@ export function UserSettingsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
             <div className="p-3 rounded-xl bg-muted/30 border border-border/80">
               <span className="text-muted-foreground text-[10px]">Account Email</span>
-              <p className="font-semibold text-foreground truncate mt-0.5">{user?.email || 'N/A'}</p>
+              <p className="font-semibold text-foreground truncate mt-0.5">
+                {user?.email || 'N/A'}
+              </p>
             </div>
             <div className="p-3 rounded-xl bg-muted/30 border border-border/80">
               <span className="text-muted-foreground text-[10px]">User Identifier</span>
-              <p className="font-mono text-[11px] text-foreground truncate mt-0.5">{user?.id || 'N/A'}</p>
+              <p className="font-mono text-[11px] text-foreground truncate mt-0.5">
+                {user?.id || 'N/A'}
+              </p>
             </div>
             <div className="p-3 rounded-xl bg-muted/30 border border-border/80">
               <span className="text-muted-foreground text-[10px]">Auth Provider</span>
@@ -198,6 +331,16 @@ export function UserSettingsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        title="Permanently Delete Account?"
+        description="This will permanently delete your profile, erase all your cloud and offline drafts, and terminate your active session. This action cannot be reversed."
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete My Account'}
+        variant="destructive"
+        onConfirm={handleDeleteAccount}
+      />
     </div>
   )
 }

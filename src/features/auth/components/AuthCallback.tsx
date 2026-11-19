@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useRouter } from '@/app/router'
+import { validateRedirectUrl } from '@/lib/security'
 import { Button } from '@/components/ui/button'
 import { Feather, AlertCircle, ArrowLeft, ShieldAlert } from 'lucide-react'
 
@@ -28,9 +29,11 @@ export function AuthCallback() {
   useEffect(() => {
     if (errorMessage) return
 
-    // Extract returnUrl if preserved
+    // Extract returnUrl and validate strictly
     const searchParams = new URLSearchParams(window.location.search)
-    const returnUrl = searchParams.get('returnUrl') || sessionStorage.getItem('draftin_return_url')
+    const rawReturnUrl =
+      searchParams.get('returnUrl') || sessionStorage.getItem('draftin_return_url')
+    const safeReturnUrl = rawReturnUrl ? validateRedirectUrl(rawReturnUrl, '/app') : null
 
     // Complete session exchange
     supabase.auth.getSession().then(({ data, error: sessionError }) => {
@@ -43,19 +46,24 @@ export function AuthCallback() {
         // Clear stored return URL
         sessionStorage.removeItem('draftin_return_url')
 
-        // Route by role or returnUrl
+        // Route strictly by server claims
         const resolvedUser = data.session.user
         const isUserAdmin =
           resolvedUser.app_metadata?.role === 'admin' ||
-          resolvedUser.app_metadata?.is_admin === true ||
-          resolvedUser.user_metadata?.role === 'admin'
+          resolvedUser.app_metadata?.is_admin === true
 
-        if (isUserAdmin && (!returnUrl || returnUrl.startsWith('/admin'))) {
-          navigate('/admin', { replace: true })
-        } else if (returnUrl && returnUrl.startsWith('/app')) {
-          navigate(returnUrl, { replace: true })
+        if (isUserAdmin) {
+          if (safeReturnUrl && safeReturnUrl.startsWith('/admin')) {
+            navigate(safeReturnUrl, { replace: true })
+          } else {
+            navigate('/admin', { replace: true })
+          }
         } else {
-          navigate('/app', { replace: true })
+          if (safeReturnUrl && safeReturnUrl.startsWith('/app')) {
+            navigate(safeReturnUrl, { replace: true })
+          } else {
+            navigate('/app', { replace: true })
+          }
         }
       }
     })
@@ -65,15 +73,23 @@ export function AuthCallback() {
   useEffect(() => {
     if (!errorMessage && !isLoading && user) {
       const searchParams = new URLSearchParams(window.location.search)
-      const returnUrl = searchParams.get('returnUrl') || sessionStorage.getItem('draftin_return_url')
+      const rawReturnUrl =
+        searchParams.get('returnUrl') || sessionStorage.getItem('draftin_return_url')
+      const safeReturnUrl = rawReturnUrl ? validateRedirectUrl(rawReturnUrl, '/app') : null
       sessionStorage.removeItem('draftin_return_url')
 
-      if (isAdmin && (!returnUrl || returnUrl.startsWith('/admin'))) {
-        navigate('/admin', { replace: true })
-      } else if (returnUrl && returnUrl.startsWith('/app')) {
-        navigate(returnUrl, { replace: true })
+      if (isAdmin) {
+        if (safeReturnUrl && safeReturnUrl.startsWith('/admin')) {
+          navigate(safeReturnUrl, { replace: true })
+        } else {
+          navigate('/admin', { replace: true })
+        }
       } else {
-        navigate('/app', { replace: true })
+        if (safeReturnUrl && safeReturnUrl.startsWith('/app')) {
+          navigate(safeReturnUrl, { replace: true })
+        } else {
+          navigate('/app', { replace: true })
+        }
       }
     }
   }, [user, isAdmin, isLoading, errorMessage, navigate])

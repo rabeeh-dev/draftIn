@@ -13,42 +13,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<AuthError | null>(null)
   const [role, setRole] = useState<'admin' | 'user'>('user')
   const [isAdmin, setIsAdmin] = useState(false)
+  const [status, setStatus] = useState<'active' | 'suspended'>('active')
+  const [isSuspended, setIsSuspended] = useState(false)
 
-  // Resolves user role from secure claims and profile
-  const resolveUserRole = async (currentUser: User | null): Promise<'admin' | 'user'> => {
-    if (!currentUser) return 'user'
-    // 1. Secure app_metadata (set by Supabase Auth / Admin RPC)
-    if (currentUser.app_metadata?.role === 'admin' || currentUser.app_metadata?.is_admin === true) {
-      return 'admin'
+  // Resolves user role and account status from secure server claims and profile table
+  const resolveUserProfile = async (
+    currentUser: User | null
+  ): Promise<{ role: 'admin' | 'user'; status: 'active' | 'suspended' }> => {
+    if (!currentUser) return { role: 'user', status: 'active' }
+
+    let resolvedRole: 'admin' | 'user' = 'user'
+    let resolvedStatus: 'active' | 'suspended' = 'active'
+
+    // 1. Secure app_metadata (set by Supabase Auth server / admin claims)
+    if (
+      currentUser.app_metadata?.role === 'admin' ||
+      currentUser.app_metadata?.is_admin === true
+    ) {
+      resolvedRole = 'admin'
     }
-    // 2. User metadata (development override)
-    if (currentUser.user_metadata?.role === 'admin') {
-      return 'admin'
-    }
-    // 3. Database profile role column if available
+
+    // 2. Database profile role and status columns
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('role, status')
         .eq('id', currentUser.id)
         .single()
-      if (data && (data as { role?: string }).role === 'admin') {
-        return 'admin'
+
+      if (data) {
+        const p = data as { role?: string; status?: string }
+        if (p.role === 'admin') {
+          resolvedRole = 'admin'
+        }
+        if (p.status === 'suspended') {
+          resolvedStatus = 'suspended'
+        }
       }
     } catch {
       // Ignore query errors in offline/unmigrated mode
     }
-    return 'user'
+
+    return { role: resolvedRole, status: resolvedStatus }
   }
 
   useEffect(() => {
     let isCancelled = false
 
     if (user) {
-      resolveUserRole(user).then((resolvedRole) => {
+      resolveUserProfile(user).then(({ role: resolvedRole, status: resolvedStatus }) => {
         if (!isCancelled) {
           setRole(resolvedRole)
           setIsAdmin(resolvedRole === 'admin')
+          setStatus(resolvedStatus)
+          setIsSuspended(resolvedStatus === 'suspended')
         }
       })
     } else {
@@ -56,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isCancelled) {
           setRole('user')
           setIsAdmin(false)
+          setStatus('active')
+          setIsSuspended(false)
         }
       })
     }
@@ -77,7 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // 2. Listen to active auth state transitions
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
       setSession(currentSession)
       setUser(currentSession?.user ?? null)
       setIsLoading(false)
@@ -90,7 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithEmail = async (email: string, password: string) => {
     setError(null)
-    const { session: newSession, error: signInError } = await authService.signInWithEmail(email, password)
+    const { session: newSession, error: signInError } = await authService.signInWithEmail(
+      email,
+      password
+    )
     if (signInError) {
       setError(signInError)
       return { error: signInError }
@@ -102,7 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUpWithEmail = async (email: string, password: string, fullName?: string) => {
     setError(null)
-    const { session: newSession, error: signUpError } = await authService.signUpWithEmail(email, password, fullName)
+    const { session: newSession, error: signUpError } = await authService.signUpWithEmail(
+      email,
+      password,
+      fullName
+    )
     if (signUpError) {
       setError(signUpError)
       return { error: signUpError }
@@ -132,6 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setRole('user')
     setIsAdmin(false)
+    setStatus('active')
+    setIsSuspended(false)
   }
 
   const value: AuthContextType = {
@@ -141,6 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: Boolean(user),
     isAdmin,
     role,
+    status,
+    isSuspended,
     error,
     signInWithEmail,
     signUpWithEmail,

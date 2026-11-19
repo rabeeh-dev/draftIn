@@ -90,6 +90,10 @@ export interface Database {
           user_id: string
           title: string
           content: string
+          content_json: Json | null
+          version: number
+          deleted_at: string | null
+          last_saved_at: string | null
           status: 'draft' | 'scheduled' | 'published'
           is_starred: boolean
           tags: string[]
@@ -102,6 +106,10 @@ export interface Database {
           user_id: string
           title?: string
           content?: string
+          content_json?: Json | null
+          version?: number
+          deleted_at?: string | null
+          last_saved_at?: string | null
           status?: 'draft' | 'scheduled' | 'published'
           is_starred?: boolean
           tags?: string[]
@@ -114,6 +122,10 @@ export interface Database {
           user_id?: string
           title?: string
           content?: string
+          content_json?: Json | null
+          version?: number
+          deleted_at?: string | null
+          last_saved_at?: string | null
           status?: 'draft' | 'scheduled' | 'published'
           is_starred?: boolean
           tags?: string[]
@@ -131,15 +143,98 @@ export interface Database {
           }
         ]
       }
+      draft_versions: {
+        Row: {
+          id: string
+          draft_id: string
+          user_id: string
+          version_number: number
+          title: string
+          content: string
+          content_json: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          draft_id: string
+          user_id: string
+          version_number: number
+          title: string
+          content: string
+          content_json?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          draft_id?: string
+          user_id?: string
+          version_number?: number
+          title?: string
+          content?: string
+          content_json?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'draft_versions_draft_id_fkey'
+            columns: ['draft_id']
+            isOneToOne: false
+            referencedRelation: 'drafts'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          status: string
+          plan_id: string
+          current_period_end: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          status?: string
+          plan_id?: string
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          status?: string
+          plan_id?: string
+          current_period_end?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_user_active: {
+        Args: {
+          check_user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      draft_status: 'draft' | 'scheduled' | 'published'
     }
     CompositeTypes: {
       [_ in never]: never

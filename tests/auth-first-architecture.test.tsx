@@ -14,6 +14,8 @@ function createMockAuth(overrides: Partial<AuthContextType> = {}): AuthContextTy
     user: null,
     session: null,
     role: 'user',
+    status: 'active',
+    isSuspended: false,
     isAdmin: false,
     isAuthenticated: false,
     isLoading: false,

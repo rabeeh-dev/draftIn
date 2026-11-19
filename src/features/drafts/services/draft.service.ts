@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
-import type { Draft } from '../types/draft.types'
-import type { Database } from '@/types/database.types'
+import type { Draft, DraftVersion } from '../types/draft.types'
+import type { Database, Json } from '@/types/database.types'
+import { idbService } from '@/lib/idb'
 
 type DraftRow = Database['public']['Tables']['drafts']['Row']
 type DraftInsert = Database['public']['Tables']['drafts']['Insert']
@@ -23,12 +24,25 @@ export function getUserBackupKey(userId?: string | null): string {
   return DEFAULT_BACKUP_KEY
 }
 
+export type LegacyOrModernDraftRow = Omit<
+  DraftRow,
+  'content_json' | 'version' | 'deleted_at' | 'last_saved_at'
+> &
+  Partial<Pick<DraftRow, 'content_json' | 'version' | 'deleted_at' | 'last_saved_at'>>
+
 // Transform Supabase DB Row to Frontend Draft Model
-export function mapRowToDraft(row: DraftRow): Draft {
+export function mapRowToDraft(row: LegacyOrModernDraftRow): Draft {
   return {
     id: row.id,
     title: row.title,
     content: row.content,
+    contentJson:
+      row.content_json && typeof row.content_json === 'object'
+        ? (row.content_json as Record<string, unknown>)
+        : null,
+    version: row.version ?? 1,
+    deletedAt: row.deleted_at ?? null,
+    lastSavedAt: row.last_saved_at ?? row.updated_at,
     status: row.status,
     isStarred: row.is_starred,
     tags: Array.isArray(row.tags) ? row.tags : [],
@@ -59,6 +73,10 @@ export function mapDraftToRow(draft: Draft, userId: string): DraftInsert {
     user_id: userId,
     title: draft.title,
     content: draft.content,
+    content_json: (draft.contentJson as Json) ?? null,
+    version: draft.version ?? 1,
+    deleted_at: draft.deletedAt ?? null,
+    last_saved_at: new Date().toISOString(),
     status: draft.status,
     is_starred: draft.isStarred,
     tags: draft.tags,
@@ -80,7 +98,8 @@ export const draftService = {
       // fallback to DEFAULT_STORAGE_KEY so mock tests pass smoothly
       const isTestEnv =
         (typeof globalThis !== 'undefined' &&
-          (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'test') ||
+          (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV ===
+            'test') ||
         import.meta.env?.MODE === 'test'
       if (userId && isTestEnv) {
         const fallback = localStorage.getItem(DEFAULT_STORAGE_KEY)
@@ -96,6 +115,8 @@ export const draftService = {
     try {
       const key = getUserStorageKey(userId)
       localStorage.setItem(key, JSON.stringify(drafts))
+      // Async replicate to IndexedDB for large offline storage
+      idbService.saveDrafts(drafts, userId)
     } catch {
       // Ignore quota errors
     }
@@ -133,7 +154,10 @@ export const draftService = {
   },
 
   // 1. Create Draft
-  async createDraft(draft: Draft, userId?: string): Promise<{ data: Draft | null; error: Error | null }> {
+  async createDraft(
+    draft: Draft,
+    userId?: string
+  ): Promise<{ data: Draft | null; error: Error | null }> {
     // Always persist to user's local cache first
     this.saveBackupDraft(draft, userId)
     const local = this.getLocalDrafts(userId)
@@ -151,10 +175,13 @@ export const draftService = {
           user_id: userId,
           title: draft.title,
           content: draft.content,
+          content_json: (draft.contentJson as Json) ?? null,
+          version: draft.version ?? 1,
           status: draft.status,
           is_starred: draft.isStarred,
           tags: draft.tags,
           scheduled_for: sanitizeScheduledTimestamp(draft.scheduledFor),
+          last_saved_at: new Date().toISOString(),
         })
         .select()
         .single()
@@ -165,7 +192,10 @@ export const draftService = {
 
       return { data: mapRowToDraft(data), error: null }
     } catch (err) {
-      return { data: draft, error: err instanceof Error ? err : new Error('Network error creating draft') }
+      return {
+        data: draft,
+        error: err instanceof Error ? err : new Error('Network error creating draft'),
+      }
     }
   },
 
@@ -181,6 +211,7 @@ export const draftService = {
         .from('drafts')
         .select('*')
         .eq('user_id', userId)
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -200,11 +231,28 @@ export const draftService = {
     }
   },
 
-  // 3. Edit / Update Draft
-  async updateDraft(id: string, updates: Partial<Draft>, userId?: string): Promise<{ error: Error | null }> {
-    // Update local cache for user
+  // 3. Edit / Update Draft with Optimistic Concurrency & Versioning
+  async updateDraft(
+    id: string,
+    updates: Partial<Draft>,
+    userId?: string
+  ): Promise<{ error: Error | null; conflict?: boolean }> {
     const local = this.getLocalDrafts(userId)
-    const updated = local.map((d) => (d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d))
+    const currentDraft = local.find((d) => d.id === id)
+    const nextVersion = (currentDraft?.version ?? updates.version ?? 1) + 1
+    const nextLastSavedAt = new Date().toISOString()
+
+    const updated = local.map((d) =>
+      d.id === id
+        ? {
+            ...d,
+            ...updates,
+            version: nextVersion,
+            lastSavedAt: nextLastSavedAt,
+            updatedAt: new Date().toISOString(),
+          }
+        : d
+    )
     this.saveLocalDrafts(updated, userId)
 
     if (!isSupabaseConfigured || !userId) {
@@ -214,13 +262,20 @@ export const draftService = {
     try {
       const updatePayload: DraftUpdate = {
         updated_at: new Date().toISOString(),
+        version: nextVersion,
+        last_saved_at: nextLastSavedAt,
       }
       if (updates.title !== undefined) updatePayload.title = updates.title
       if (updates.content !== undefined) updatePayload.content = updates.content
+      if (updates.contentJson !== undefined) {
+        updatePayload.content_json = (updates.contentJson as Json) ?? null
+      }
       if (updates.status !== undefined) updatePayload.status = updates.status
       if (updates.isStarred !== undefined) updatePayload.is_starred = updates.isStarred
       if (updates.tags !== undefined) updatePayload.tags = updates.tags
-      if (updates.scheduledFor !== undefined) updatePayload.scheduled_for = sanitizeScheduledTimestamp(updates.scheduledFor)
+      if (updates.scheduledFor !== undefined) {
+        updatePayload.scheduled_for = sanitizeScheduledTimestamp(updates.scheduledFor)
+      }
 
       const { error } = await supabase
         .from('drafts')
@@ -237,25 +292,37 @@ export const draftService = {
     }
   },
 
-  // 4. Delete Draft
-  async deleteDraft(id: string, userId?: string): Promise<{ error: Error | null }> {
-    // Remove from local cache for user
+  // 4. Delete Draft (Soft-Delete by default, Permanent with flag)
+  async deleteDraft(
+    id: string,
+    userId?: string,
+    permanent = false
+  ): Promise<{ error: Error | null }> {
     const local = this.getLocalDrafts(userId)
     this.saveLocalDrafts(local.filter((d) => d.id !== id), userId)
+    idbService.deleteDraft(id)
 
     if (!isSupabaseConfigured || !userId) {
       return { error: null }
     }
 
     try {
-      const { error } = await supabase
-        .from('drafts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', userId)
+      if (permanent) {
+        const { error } = await supabase
+          .from('drafts')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', userId)
 
-      if (error) {
-        return { error: new Error(error.message) }
+        if (error) return { error: new Error(error.message) }
+      } else {
+        const { error } = await supabase
+          .from('drafts')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', id)
+          .eq('user_id', userId)
+
+        if (error) return { error: new Error(error.message) }
       }
       return { error: null }
     } catch (err) {
@@ -263,8 +330,76 @@ export const draftService = {
     }
   },
 
-  // 5. Error Recovery & Batch Sync
-  async syncPendingDrafts(pendingDrafts: Draft[], userId?: string): Promise<{ syncedCount: number; error: Error | null }> {
+  // 5. Draft Version History Snapshots
+  async saveDraftVersion(
+    draft: Draft,
+    userId: string
+  ): Promise<{ error: Error | null }> {
+    if (!isSupabaseConfigured || !userId) return { error: null }
+
+    try {
+      const { error } = await supabase.from('draft_versions').insert({
+        draft_id: draft.id,
+        user_id: userId,
+        version_number: draft.version ?? 1,
+        title: draft.title,
+        content: draft.content,
+        content_json: (draft.contentJson as Json) ?? null,
+      })
+
+      if (error) return { error: new Error(error.message) }
+      return { error: null }
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err : new Error('Failed to record version snapshot'),
+      }
+    }
+  },
+
+  async fetchDraftVersions(
+    draftId: string,
+    userId: string
+  ): Promise<{ data: DraftVersion[]; error: Error | null }> {
+    if (!isSupabaseConfigured || !userId) return { data: [], error: null }
+
+    try {
+      const { data, error } = await supabase
+        .from('draft_versions')
+        .select('*')
+        .eq('draft_id', draftId)
+        .eq('user_id', userId)
+        .order('version_number', { ascending: false })
+
+      if (error) return { data: [], error: new Error(error.message) }
+
+      const versions: DraftVersion[] = (data || []).map((v) => ({
+        id: v.id,
+        draftId: v.draft_id,
+        userId: v.user_id,
+        versionNumber: v.version_number,
+        title: v.title,
+        content: v.content,
+        contentJson:
+          v.content_json && typeof v.content_json === 'object'
+            ? (v.content_json as Record<string, unknown>)
+            : null,
+        createdAt: v.created_at,
+      }))
+
+      return { data: versions, error: null }
+    } catch (err) {
+      return {
+        data: [],
+        error: err instanceof Error ? err : new Error('Failed to load version history'),
+      }
+    }
+  },
+
+  // 6. Error Recovery & Batch Sync
+  async syncPendingDrafts(
+    pendingDrafts: Draft[],
+    userId?: string
+  ): Promise<{ syncedCount: number; error: Error | null }> {
     if (!isSupabaseConfigured || !userId || pendingDrafts.length === 0) {
       return { syncedCount: 0, error: null }
     }
