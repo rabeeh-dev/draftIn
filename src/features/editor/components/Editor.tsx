@@ -31,7 +31,7 @@ export function Editor() {
     content: activeDraft?.content || '',
     editorProps: {
       attributes: {
-        class: 'tiptap focus:outline-none w-full min-h-[380px] md:min-h-[480px] text-sm md:text-base leading-relaxed text-foreground font-sans prose dark:prose-invert max-w-none',
+        class: 'tiptap ProseMirror focus:outline-none w-full min-h-[380px] md:min-h-[480px] text-sm md:text-base leading-relaxed text-foreground font-sans prose dark:prose-invert max-w-none whitespace-pre-wrap',
         'data-gramm': 'false',
         'data-gramm_editor': 'false',
         'data-enable-grammarly': 'false',

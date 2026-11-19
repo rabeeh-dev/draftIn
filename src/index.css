@@ -146,9 +146,20 @@ body {
 }
 
 /* Tiptap & ProseMirror Editor Custom Styling */
-.tiptap {
+.tiptap,
+.ProseMirror {
   outline: none;
   min-height: 280px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ProseMirror {
+  position: relative;
+}
+
+.ProseMirror-focused {
+  outline: none;
 }
 
 .tiptap p.is-editor-empty:first-child::before {
