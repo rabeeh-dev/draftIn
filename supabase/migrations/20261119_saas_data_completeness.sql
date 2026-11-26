@@ -10,6 +10,7 @@ create policy "Users can insert their own profile"
   on public.profiles for insert
   with check (auth.uid() = id);
 
+
 -- 3. Admin Oversight Policies for Drafts
 -- Allows administrators to query global draft metrics and manage content in Admin Console
 create policy "Admins can view all drafts"
